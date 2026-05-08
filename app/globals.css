@@ -1,2 +1,81 @@
 @import "tailwindcss";
 @custom-variant dark (&:is(.dark *));
+
+/* ── CUSTOM ANIMATIONS ─────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.3; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+.animate-slide-up { animation: slideUp 0.4s ease-out forwards; }
+.animate-slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
+.animate-scale-in { animation: scaleIn 0.2s ease-out forwards; }
+.animate-pulse-slow { animation: pulse-slow 8s ease-in-out infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+/* ── SCROLLBAR ─────────────────────────────────────────────── */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; }
+
+/* ── DATE PICKER ───────────────────────────────────────────── */
+input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.5; transition: 0.2s; }
+input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+.dark input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+/* ── VIEW TRANSITIONS ──────────────────────────────────────── */
+.view-container {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* ── BOTTOM NAV ────────────────────────────────────────────── */
+.bottom-nav {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* ── SIDEBAR ───────────────────────────────────────────────── */
+.sidebar {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* ── GLASS CARD ────────────────────────────────────────────── */
+.glass-card {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── LINE CLAMP ────────────────────────────────────────────── */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
