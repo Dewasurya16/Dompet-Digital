@@ -15,18 +15,26 @@ export async function POST(req: Request) {
       minimumFractionDigits: 0,
     }).format(amount);
 
+    // Ekstrak nama dari email (contoh: budi@gmail.com jadi Budi)
+    const usernameRaw = email.split('@')[0];
+    const displayName = usernameRaw.charAt(0).toUpperCase() + usernameRaw.slice(1);
+
     const isIncome = type === 'pemasukan';
-    // Tema Warna: Emerald untuk Pemasukan, Rose/Merah untuk Pengeluaran
-    const themeColor = isIncome ? '#10B981' : '#F43F5E';
-    const iconSymbol = isIncome ? '↓' : '↑';
-    const typeText = isIncome ? 'Pemasukan' : 'Pengeluaran';
+
+    // Palet Warna Pastel & Modern
+    const themeColor = isIncome ? '#059669' : '#E11D48'; // Emerald tua / Rose tua
+    const lightBg = isIncome ? '#ECFDF5' : '#FFF1F2'; // Background atas yang sangat soft
+    const iconSymbol = isIncome ? '↓ Pemasukan' : '↑ Pengeluaran';
+
+    // Kata-kata ramah (Friendly Copywriting)
+    const friendlyMessage = isIncome
+      ? 'Wah, alhamdulillah ada dana masuk nih! Asik, saldo nambah makin tebal. 🎉'
+      : 'Catatan pengeluaranmu sudah kami simpan dengan rapi. Tetap bijak berbelanja ya! 💸';
 
     const { data, error } = await resend.emails.send({
-      // MENGGUNAKAN DOMAIN BARUMU YANG SUDAH VERIFIED
       from: 'My Dompet Digital <no-reply@mydompetdigital.my.id>',
-      // Mengirim dinamis ke email user yang sedang login
       to: [email],
-      subject: `[Berhasil] Struk ${typeText} - ${formattedAmount}`,
+      subject: `Halo ${displayName}, ini struk ${type} barumu!`,
       html: `
             <!DOCTYPE html>
             <html lang="id">
@@ -34,65 +42,76 @@ export async function POST(req: Request) {
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
             </head>
-            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F1F5F9; margin: 0; padding: 40px 15px; -webkit-font-smoothing: antialiased;">
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F8FAFC; margin: 0; padding: 40px 15px; -webkit-font-smoothing: antialiased; color: #334155;">
               
-              <div style="max-width: 420px; margin: 0 auto; background: #FFFFFF; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);">
+              <!-- Main Container -->
+              <div style="max-width: 460px; margin: 0 auto;">
                 
-                <!-- Header Berwarna -->
-                <div style="background-color: ${themeColor}; padding: 35px 20px 25px; text-align: center;">
-                  <div style="width: 54px; height: 54px; background-color: #FFFFFF; border-radius: 50%; margin: 0 auto 15px; display: inline-block; line-height: 54px;">
-                    <span style="color: ${themeColor}; font-size: 26px; font-weight: 900;">${iconSymbol}</span>
+                <!-- Sapaan Friendly -->
+                <div style="text-align: center; margin-bottom: 30px;">
+                  <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #3B82F6, #6366F1); border-radius: 18px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; line-height: 56px; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);">
+                    👛
                   </div>
-                  <h2 style="margin: 0; color: #FFFFFF; font-size: 22px; font-weight: 800; letter-spacing: 0.5px;">Transaksi Sukses</h2>
-                  <p style="margin: 6px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 500;">${date}</p>
+                  <h2 style="margin: 0 0 8px 0; color: #0F172A; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">
+                    HALOO, ${displayName}! 👋
+                  </h2>
+                  <p style="margin: 0; color: #64748B; font-size: 15px; line-height: 1.6; padding: 0 20px;">
+                    ${friendlyMessage}<br>Berikut adalah rincian transaksimu:
+                  </p>
                 </div>
-                
-                <div style="padding: 30px 25px;">
+
+                <!-- Kartu Struk (Receipt Card) -->
+                <div style="background: #FFFFFF; border-radius: 28px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01); border: 1px solid #E2E8F0;">
                   
-                  <!-- Nominal -->
-                  <div style="text-align: center; margin-bottom: 25px;">
-                    <p style="margin: 0 0 5px 0; color: #64748B; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">Total ${typeText}</p>
-                    <h1 style="margin: 0; color: #0F172A; font-size: 38px; font-weight: 900; letter-spacing: -1px;">${formattedAmount}</h1>
+                  <!-- Bagian Atas (Nominal) -->
+                  <div style="padding: 40px 30px 35px; text-align: center; background-color: ${lightBg}; border-bottom: 2px dashed #CBD5E1;">
+                    <div style="display: inline-block; padding: 8px 16px; background-color: #FFFFFF; border-radius: 20px; color: ${themeColor}; font-size: 12px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                      ${iconSymbol}
+                    </div>
+                    <h1 style="margin: 0; color: ${themeColor}; font-size: 42px; font-weight: 900; letter-spacing: -1.5px;">
+                      ${formattedAmount}
+                    </h1>
+                    <p style="margin: 12px 0 0 0; color: #64748B; font-size: 13px; font-weight: 600;">
+                      ${date}
+                    </p>
                   </div>
 
-                  <!-- Kotak Rincian (Card in Card) -->
-                  <div style="background-color: #F8FAFC; border-radius: 16px; padding: 20px; border: 1px solid #E2E8F0;">
+                  <!-- Bagian Bawah (Rincian Tabel) -->
+                  <div style="padding: 30px;">
                     <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                       <tr>
-                        <td style="padding: 0 0 14px 0; color: #64748B; font-weight: 500; width: 40%;">Keterangan</td>
-                        <td style="padding: 0 0 14px 0; color: #0F172A; text-align: right; font-weight: 700;">${title}</td>
+                        <td style="padding: 0 0 16px 0; color: #64748B; font-weight: 500;">Keterangan</td>
+                        <td style="padding: 0 0 16px 0; color: #0F172A; text-align: right; font-weight: 800;">${title}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 14px 0; color: #64748B; font-weight: 500; border-top: 1px dashed #CBD5E1;">Kategori</td>
-                        <td style="padding: 14px 0; color: #0F172A; text-align: right; font-weight: 700; border-top: 1px dashed #CBD5E1;">${category}</td>
+                        <td style="padding: 16px 0; color: #64748B; font-weight: 500; border-top: 1px solid #F1F5F9;">Kategori</td>
+                        <td style="padding: 16px 0; color: #0F172A; text-align: right; font-weight: 800; border-top: 1px solid #F1F5F9;">${category}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 14px 0; color: #64748B; font-weight: 500; border-top: 1px dashed #CBD5E1;">Sumber Dana</td>
-                        <td style="padding: 14px 0; color: #3B82F6; text-align: right; font-weight: 700; border-top: 1px dashed #CBD5E1;">${wallet}</td>
+                        <td style="padding: 16px 0; color: #64748B; font-weight: 500; border-top: 1px solid #F1F5F9;">Sumber Dana</td>
+                        <td style="padding: 16px 0; color: #3B82F6; text-align: right; font-weight: 800; border-top: 1px solid #F1F5F9;">${wallet}</td>
                       </tr>
                       <tr>
-                        <td style="padding: 14px 0; color: #64748B; font-weight: 500; border-top: 1px dashed #CBD5E1;">Status</td>
-                        <td style="padding: 14px 0; color: #10B981; text-align: right; font-weight: 700; border-top: 1px dashed #CBD5E1;">Berhasil <span style="font-size: 12px;">✅</span></td>
+                        <td style="padding: 16px 0; color: #64748B; font-weight: 500; border-top: 1px solid #F1F5F9;">Status</td>
+                        <td style="padding: 16px 0; color: #10B981; text-align: right; font-weight: 800; border-top: 1px solid #F1F5F9;">Sukses ✅</td>
                       </tr>
                       <tr>
-                        <td style="padding: 14px 0 0 0; color: #64748B; font-weight: 500; border-top: 1px dashed #CBD5E1;">Ref ID</td>
-                        <td style="padding: 14px 0 0 0; color: #0F172A; text-align: right; border-top: 1px dashed #CBD5E1;">
-                          <span style="font-family: monospace; background: #E2E8F0; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; color: #334155;">${refId}</span>
+                        <td style="padding: 20px 0 0 0; color: #64748B; font-weight: 500; border-top: 1px solid #F1F5F9;">Ref ID</td>
+                        <td style="padding: 20px 0 0 0; text-align: right; border-top: 1px solid #F1F5F9;">
+                          <span style="font-family: 'Courier New', Courier, monospace; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 700; color: #475569; letter-spacing: 0.5px;">
+                            ${refId}
+                          </span>
                         </td>
                       </tr>
                     </table>
                   </div>
 
                 </div>
-                
-                <!-- Footer Aplikasi -->
-                <div style="background-color: #F8FAFC; padding: 20px; text-align: center; border-top: 1px solid #E2E8F0;">
-                  <p style="margin: 0; color: #334155; font-size: 13px; font-weight: 700;">
-                    👛 My Dompet Digital
-                  </p>
-                  <p style="margin: 5px 0 0 0; color: #94A3B8; font-size: 11px;">
-                    Simpan struk ini sebagai bukti transaksi yang sah.<br>Sistem otomatis oleh Resend.
-                  </p>
+
+                <!-- Footer Pesan Semangat -->
+                <div style="text-align: center; margin-top: 35px; color: #94A3B8; font-size: 13px; line-height: 1.6;">
+                  <p style="margin: 0 0 10px 0;">Terus semangat pantau keuanganmu biar target impian cepat tercapai! 💪</p>
+                  <p style="margin: 0;">Dikirim dengan ❤️ oleh <strong>My Dompet Digital</strong><br><a href="https://mydompetdigital.my.id" style="color: #3B82F6; text-decoration: none; font-weight: 600;">mydompetdigital.my.id</a></p>
                 </div>
 
               </div>
