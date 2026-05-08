@@ -11,7 +11,7 @@ import {
   Eye, EyeOff, Receipt, ShieldAlert, RefreshCw, Gem, Briefcase,
   AlertOctagon, CreditCard, MessageSquare, Landmark, Copy, CalendarSearch,
   TrendingUp, TrendingDown, BarChart3, PiggyBank, Check, Percent,
-  ChevronRight, Bell, Info, Zap, Home, LayoutGrid, Camera // Ditambahkan Camera Icon
+  ChevronRight, Bell, Info, Zap, Home, LayoutGrid, Camera, Lightbulb
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import jsPDF from 'jspdf';
@@ -52,7 +52,7 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
     info: 'bg-slate-800 text-white dark:bg-slate-700',
   };
   return (
-    <div className="fixed bottom-6 right-4 z-[999] flex flex-col gap-2 pointer-events-none">
+    <div className="fixed bottom-24 lg:bottom-6 right-4 z-[999] flex flex-col gap-2 pointer-events-none">
       {toasts.map(t => (
         <div key={t.id} className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-sm font-semibold max-w-xs pointer-events-auto animate-in slide-in-from-right duration-300 ${styles[t.type]}`}>
           {icons[t.type]}
@@ -99,6 +99,7 @@ export default function DompetPintarPro() {
 
   // NEW STATE: Loading saat Scan Struk AI
   const [isScanning, setIsScanning] = useState(false);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
 
   const [transactions, setTransactions] = useState<any[]>([]);
   const [formData, setFormData] = useState({ title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai' });
@@ -124,7 +125,6 @@ export default function DompetPintarPro() {
   const [aiPersonality, setAiPersonality] = useState('motivator');
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
 
-  // ── NEW: Toast & Confirm ──
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [confirmState, setConfirmState] = useState<any>(null);
 
@@ -238,14 +238,11 @@ export default function DompetPintarPro() {
       else {
         showToast('Registrasi berhasil! Silakan masuk.', 'success');
         setIsRegistering(false);
-
-        // --- TAMBAHKAN KODE INI UNTUK EMAIL WELCOME ---
         fetch('/api/send-notification', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: authEmail, type: 'welcome' })
         }).catch(console.error);
-        // ----------------------------------------------
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
@@ -284,10 +281,17 @@ export default function DompetPintarPro() {
     else { showToast('Gagal mereset data.', 'error'); setIsSubmitting(false); }
   };
 
-  // ── FUNGSI BARU: SCAN STRUK DENGAN AI ──
+  // ── SCAN STRUK DENGAN AI (DIPERBAIKI) ──
   const handleScanReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Reset input agar bisa klik file yang sama
+    e.target.value = '';
+
+    // Munculkan preview
+    const previewUrl = URL.createObjectURL(file);
+    setReceiptPreview(previewUrl);
 
     setIsScanning(true);
     showToast("AI sedang membaca struk... 🤖", "info");
@@ -298,11 +302,15 @@ export default function DompetPintarPro() {
       try {
         const res = await fetch('/api/scan-receipt', {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json', // PENTING
+          },
           body: JSON.stringify({ imageBase64: base64 })
         });
+
         const data = await res.json();
 
-        if (data.title) {
+        if (res.ok && data.title) {
           setFormData(prev => ({
             ...prev,
             title: data.title,
@@ -312,17 +320,17 @@ export default function DompetPintarPro() {
           }));
           showToast("Struk berhasil dipindai! Silakan cek form.", "success");
         } else {
-          showToast("Gagal membaca struk.", "error");
+          showToast(data.error || "Gagal membaca struk.", "error");
         }
       } catch (err) {
-        showToast("Terjadi kesalahan server.", "error");
+        console.error("Error Scan API:", err);
+        showToast("Terjadi kesalahan koneksi ke server.", "error");
       }
       setIsScanning(false);
     };
     reader.readAsDataURL(file);
   };
 
-  // Helper untuk Level Up Check
   const getLevelInfoSync = (nw: number) => {
     if (nw >= 50000000) return { title: 'Sultan', icon: '👑' };
     if (nw >= 10000000) return { title: 'Master Hemat', icon: '💎' };
@@ -330,14 +338,12 @@ export default function DompetPintarPro() {
     return { title: 'Pemula', icon: '🌱' };
   };
 
-  // ── MODIFIKASI: EMAIL TRIGGER DIMASUKKAN KE SINI ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.amount) return;
     setIsSubmitting(true);
     const payload = { title: formData.title, amount: Number(formData.amount), type: formData.type, category: formData.category, wallet: formData.wallet };
 
-    // Simpan Net Worth lama untuk cek Level Up
     const oldNetWorth = stats.globalNetWorth;
 
     if (editingId) {
@@ -345,22 +351,22 @@ export default function DompetPintarPro() {
       setIsSubmitting(false);
       if (!error) {
         setEditingId(null);
+        setReceiptPreview(null);
         setFormData({ title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai' });
         fetchData();
         showToast('Transaksi berhasil diperbarui!', 'success');
       } else showToast(`Gagal update: ${error.message}`, 'error');
     } else {
-      // PERUBAHAN: Tambah .select().single() agar kita mendapat data yang utuh (termasuk ID dan tanggal)
       const { data, error } = await supabase.from('transactions').insert([payload]).select().single();
       setIsSubmitting(false);
 
       if (!error && data) {
         setFormData({ title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai' });
+        setReceiptPreview(null);
         fetchData();
         showToast('Transaksi berhasil disimpan! 🎉', 'success');
 
         if (session?.user?.email) {
-          // 1. Tembak API Route di Next.js untuk kirim notifikasi email struk
           fetch('/api/send-receipt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -374,9 +380,8 @@ export default function DompetPintarPro() {
               refId: data.id.split('-')[0].toUpperCase(),
               date: new Date(data.created_at).toLocaleString('id-ID')
             })
-          }).catch(err => console.error('Gagal memicu pengiriman email struk:', err));
+          }).catch(console.error);
 
-          // 2. CEK LEVEL UP (Gamifikasi)
           const newNetWorth = payload.type === 'pemasukan' ? oldNetWorth + payload.amount : oldNetWorth - payload.amount;
           const oldLevel = getLevelInfoSync(oldNetWorth);
           const newLevel = getLevelInfoSync(newNetWorth);
@@ -385,25 +390,18 @@ export default function DompetPintarPro() {
             fetch('/api/send-notification', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: session.user.email,
-                type: 'levelup',
-                data: { newLevel: newLevel.title, icon: newLevel.icon }
-              })
+              body: JSON.stringify({ email: session.user.email, type: 'levelup', data: { newLevel: newLevel.title, icon: newLevel.icon } })
             }).catch(console.error);
             showToast(`Selamat! Kamu naik level jadi ${newLevel.title}! 👑`, 'success');
           }
         }
-
       } else showToast(`Gagal simpan: ${error?.message}`, 'error');
     }
   };
 
-  const applyQuickAction = (title: string, amount: string, category: string) =>
-    setFormData(prev => ({ ...prev, title, amount, type: 'pengeluaran', category }));
-
   const handleEditClick = (t: any) => {
     setEditingId(t.id);
+    setReceiptPreview(null);
     setFormData({ title: t.title, amount: t.amount.toString(), type: t.type, category: t.category, wallet: t.wallet || 'Kas Tunai' });
     document.getElementById('formCatat')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -418,6 +416,7 @@ export default function DompetPintarPro() {
 
   const handleCancelEdit = () => {
     setEditingId(null);
+    setReceiptPreview(null);
     setFormData({ title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai' });
   };
 
@@ -426,10 +425,10 @@ export default function DompetPintarPro() {
     if (!ok) return;
     setFormData({ title: t.title, amount: t.amount.toString(), type: t.type, category: t.category, wallet: t.wallet || 'Kas Tunai' });
     setEditingId(null);
+    setReceiptPreview(null);
     document.getElementById('formCatat')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // ── FIX: timezone-safe month list ──
   const availableMonths = useMemo(() => {
     const months = new Set(transactions.map(t => {
       const d = new Date(t.created_at);
@@ -484,14 +483,12 @@ export default function DompetPintarPro() {
     const globalInvSold = transactions.filter(t => t.type === 'pemasukan' && t.category === 'Investasi').reduce((acc, curr) => acc + Number(curr.amount), 0);
     const globalNetWorth = globalBalance + Math.max(0, globalInvBought - globalInvSold);
 
-    // NEW: savings rate & cashflow ratio
     const savingsRate = income > 0 ? Math.max(0, Math.round(((income - expense) / income) * 100)) : 0;
     const cashflowRatio = income > 0 ? Math.min(100, Math.round((expense / income) * 100)) : 0;
 
     return { income, expense, balance, totalAssets, netWorth, totalBills, globalNetWorth, billsTransactions, savingsRate, cashflowRatio };
   }, [filteredTransactions, transactions, initialBalance, filterMonth, filterMode]);
 
-  // NEW: per-wallet breakdown
   const walletBreakdown = useMemo(() => {
     const walletMap: Record<string, { income: number; expense: number }> = {};
     transactions.forEach(t => {
@@ -541,7 +538,6 @@ export default function DompetPintarPro() {
     return insights;
   }, [stats, catBudgets, filteredTransactions, aiPersonality]);
 
-  // ── MODIFIKASI EXPORT (Dengan Fitur Email) ──
   const exportPDF = async () => {
     const doc = new jsPDF();
     doc.setFillColor(37, 99, 235); doc.rect(0, 0, 210, 40, 'F');
@@ -570,7 +566,6 @@ export default function DompetPintarPro() {
     doc.save(filename);
     showToast('PDF berhasil diunduh!', 'success');
 
-    // Tawarkan kirim ke email
     const wantEmail = await confirm('Kirim ke Email?', 'Apakah kamu ingin salinan PDF laporan ini dikirim ke emailmu?');
     if (wantEmail && session?.user?.email) {
       showToast('Mengirim email...', 'info');
@@ -595,7 +590,6 @@ export default function DompetPintarPro() {
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
     showToast('CSV berhasil diunduh!', 'success');
 
-    // Tawarkan kirim ke email
     const wantEmail = await confirm('Kirim ke Email?', 'Apakah kamu ingin salinan data CSV ini dikirim ke emailmu?');
     if (wantEmail && session?.user?.email) {
       showToast('Mengirim email...', 'info');
@@ -793,10 +787,10 @@ export default function DompetPintarPro() {
       </aside>
 
       {/* ═══ MAIN CONTENT ═══ */}
-      <div className="lg:ml-[250px] min-h-screen pb-24 lg:pb-0">
+      <div className="lg:ml-[250px] min-h-screen pb-28 lg:pb-0">
 
         {/* Mobile Header */}
-        <header className="lg:hidden sticky top-0 z-40 bg-white/70 dark:bg-[#09090B]/70 backdrop-blur-2xl px-5 py-4">
+        <header className="lg:hidden sticky top-0 z-40 bg-white/70 dark:bg-[#09090B]/70 backdrop-blur-2xl px-5 py-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-[#1A1A1A] dark:bg-white rounded-2xl flex items-center justify-center shadow-md">
@@ -819,29 +813,29 @@ export default function DompetPintarPro() {
         </header>
 
         {/* Desktop Top Bar */}
-        <header className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-slate-200/50 dark:border-slate-800/50 bg-white/50 dark:bg-[#111]/50 backdrop-blur-sm">
+        <header className="hidden lg:flex items-center justify-between px-8 py-5 border-b border-slate-200/50 dark:border-slate-800/50 bg-white/50 dark:bg-[#111]/50 backdrop-blur-sm sticky top-0 z-40">
           <h1 className="text-2xl font-black tracking-tight text-slate-800 dark:text-white">
             {activeView === 'dashboard' ? 'Overview' : activeView === 'transactions' ? 'Transaksi' : activeView === 'analytics' ? 'Analitik' : activeView === 'wallets' ? 'Dompet' : 'Pengaturan'}
           </h1>
           <div className="flex items-center gap-3">
             {/* Filters */}
-            <div className="flex items-center bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
-              <button onClick={() => setFilterMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${filterMode === 'month' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-500'}`}>Bulan</button>
-              <button onClick={() => setFilterMode('custom')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${filterMode === 'custom' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-500'}`}>Rentang</button>
+            <div className="flex items-center bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <button onClick={() => setFilterMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${filterMode === 'month' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Bulan</button>
+              <button onClick={() => setFilterMode('custom')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${filterMode === 'custom' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Rentang</button>
             </div>
             {filterMode === 'month' ? (
-              <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none">
+              <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none shadow-sm cursor-pointer">
                 <option value="all">Semua Waktu</option>
                 {availableMonths.map(m => <option key={m} value={m}>{parseMonthSafe(m).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}</option>)}
               </select>
             ) : (
-              <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 rounded-xl gap-1.5">
+              <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 rounded-xl gap-1.5 shadow-sm">
                 <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-transparent outline-none text-xs font-bold text-slate-700 dark:text-slate-200 w-[110px]" />
                 <span className="text-slate-300 text-xs">—</span>
                 <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-transparent outline-none text-xs font-bold text-slate-700 dark:text-slate-200 w-[110px]" />
               </div>
             )}
-            <button onClick={togglePrivacy} className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 transition-all">
+            <button onClick={togglePrivacy} className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 transition-all shadow-sm">
               {showBalance ? <Eye size={16} className="text-slate-400" /> : <EyeOff size={16} className="text-slate-400" />}
             </button>
           </div>
@@ -852,29 +846,29 @@ export default function DompetPintarPro() {
 
           {/* Mobile Filter Row */}
           <div className="lg:hidden flex flex-wrap items-center gap-2 mb-4">
-            <div className="flex items-center bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
               <button onClick={() => setFilterMode('month')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${filterMode === 'month' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-500'}`}>Bulan</button>
               <button onClick={() => setFilterMode('custom')} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${filterMode === 'custom' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-500'}`}>Rentang</button>
             </div>
             {filterMode === 'month' ? (
-              <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold outline-none flex-1">
+              <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold outline-none flex-1 shadow-sm">
                 <option value="all">Semua Waktu</option>
                 {availableMonths.map(m => <option key={m} value={m}>{parseMonthSafe(m).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}</option>)}
               </select>
             ) : (
-              <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 rounded-xl gap-1.5 flex-1">
-                <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-transparent outline-none text-xs font-bold w-[100px]" />
+              <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 rounded-xl gap-1.5 flex-1 shadow-sm">
+                <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-transparent outline-none text-xs font-bold w-[100px] text-slate-700 dark:text-slate-200" />
                 <span className="text-slate-300 text-xs">—</span>
-                <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-transparent outline-none text-xs font-bold w-[100px]" />
+                <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-transparent outline-none text-xs font-bold w-[100px] text-slate-700 dark:text-slate-200" />
               </div>
             )}
           </div>
 
           {(activeView === 'dashboard' || !activeView) && <>
-            {/* ── OVERVIEW CARDS (Cryptovio-style) ── */}
+            {/* ── OVERVIEW CARDS ── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               {/* Net Worth Card */}
-              <div className="sm:col-span-2 lg:col-span-1 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-5 rounded-2xl text-white relative overflow-hidden">
+              <div className="sm:col-span-2 lg:col-span-1 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-5 rounded-2xl text-white relative overflow-hidden shadow-lg shadow-blue-500/20">
                 <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-xl" />
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-blue-200/80">Total Kekayaan</p>
@@ -949,9 +943,8 @@ export default function DompetPintarPro() {
               </div>
             </div>
 
-
             {/* AI Insights */}
-            <div className="lg:col-span-2 bg-white dark:bg-[#111] border border-slate-200/50 dark:border-slate-800/50 p-6 rounded-[1.75rem] shadow-sm shadow-slate-200/50 dark:shadow-none flex flex-col relative overflow-hidden">
+            <div className="lg:col-span-2 bg-white dark:bg-[#111] border border-slate-200/50 dark:border-slate-800/50 p-6 rounded-[1.75rem] shadow-sm shadow-slate-200/50 dark:shadow-none flex flex-col relative overflow-hidden mb-6">
               <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] opacity-15 pointer-events-none ${aiPersonality === 'roasting' ? 'bg-rose-400' : 'bg-indigo-400'}`} />
               <div className="flex items-center justify-between mb-5 relative z-10 border-b border-slate-100 dark:border-slate-800 pb-4">
                 <div className="flex items-center gap-3">
@@ -993,7 +986,7 @@ export default function DompetPintarPro() {
             </div>
 
             {/* Recent Transactions (Dashboard compact view) */}
-            <div className="bg-white dark:bg-[#111] rounded-[1.5rem] shadow-sm shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-800/50 overflow-hidden p-6 mt-6">
+            <div className="bg-white dark:bg-[#111] rounded-[1.5rem] shadow-sm shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-800/50 overflow-hidden p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="font-bold text-[17px] text-slate-900 dark:text-white tracking-tight">Transactions</h3>
                 <button onClick={() => setActiveView('transactions')} className="text-slate-800 dark:text-white hover:opacity-70"><ArrowRight size={20} /></button>
@@ -1017,7 +1010,7 @@ export default function DompetPintarPro() {
                           {isIncome ? '+' : '-'}{displayMoney(Number(t.amount))}
                         </p>
                         <p className="text-[12px] font-medium text-slate-500">
-                          Today {new Date(t.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(t.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
                         </p>
                       </div>
                     </div>
@@ -1050,7 +1043,7 @@ export default function DompetPintarPro() {
                         <h2 className="text-[20px] font-bold text-slate-900 dark:text-white tracking-tight leading-none">
                           Operation
                         </h2>
-                        {/* TOMBOL AI SCANNER (Baru!) */}
+                        {/* TOMBOL AI SCANNER */}
                         <div className="ml-2">
                           <input type="file" accept="image/*" id="scan-receipt" className="hidden" onChange={handleScanReceipt} disabled={isScanning} />
                           <label htmlFor="scan-receipt" className="cursor-pointer flex items-center gap-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1.5 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all">
@@ -1063,6 +1056,27 @@ export default function DompetPintarPro() {
                         <button type="button" onClick={() => setFormData({ ...formData, type: 'pemasukan' })} className={`pb-1 border-b-2 transition-colors ${formData.type === 'pemasukan' ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white' : 'border-transparent hover:text-slate-700'}`}>Terima</button>
                       </div>
                     </div>
+
+                    {/* PREVIEW STRUK YANG DIUPLOAD */}
+                    {receiptPreview && (
+                      <div className="mb-4 relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#1A1A1A] p-2 flex items-center gap-4 animate-in fade-in zoom-in duration-200">
+                        <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-slate-200 dark:bg-slate-800 relative">
+                          <img src={receiptPreview} alt="Preview Struk" className="w-full h-full object-cover" />
+                          {isScanning && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm">
+                              <Loader2 size={16} className="text-white animate-spin" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Gambar Struk</p>
+                          <p className="text-[10px] text-slate-500 truncate">{isScanning ? 'AI sedang menganalisis...' : 'Analisis selesai.'}</p>
+                        </div>
+                        <button type="button" onClick={() => setReceiptPreview(null)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition-colors" disabled={isScanning}>
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                       {/* From/Wallet */}
@@ -1103,7 +1117,7 @@ export default function DompetPintarPro() {
 
                       {/* Submit */}
                       <div className="flex gap-3 pt-2">
-                        <button disabled={isSubmitting} className="w-full bg-[#1A1A1A] dark:bg-white text-white dark:text-[#1A1A1A] font-bold p-4 rounded-[1.25rem] transition-all active:scale-[0.98] disabled:opacity-50 text-[15px] flex items-center justify-center gap-2 hover:bg-black dark:hover:bg-gray-100">
+                        <button disabled={isSubmitting} className="w-full bg-[#1A1A1A] dark:bg-white text-white dark:text-[#1A1A1A] font-bold p-4 rounded-[1.25rem] transition-all active:scale-[0.98] disabled:opacity-50 text-[15px] flex items-center justify-center gap-2 hover:bg-black dark:hover:bg-gray-100 shadow-lg shadow-black/5 dark:shadow-white/5">
                           {isSubmitting ? <><Loader2 className="animate-spin" size={18} />Memproses...</> : editingId ? <><Edit2 size={18} />Update</> : <><ArrowRightLeft size={18} /> Simpan Transaksi</>}
                         </button>
                         {editingId && <button type="button" onClick={handleCancelEdit} className="px-6 bg-slate-100 dark:bg-[#1A1A1A] text-slate-600 dark:text-slate-300 font-bold rounded-[1.25rem] hover:bg-slate-200 transition-colors">Batal</button>}
@@ -1134,7 +1148,6 @@ export default function DompetPintarPro() {
                         </button>
                       </div>
                     </div>
-
 
                     <div className="flex flex-col sm:flex-row gap-2.5">
                       <div className="flex flex-1 items-center bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 focus-within:ring-2 ring-blue-500/20 shadow-sm transition-all gap-2">
@@ -1214,7 +1227,6 @@ export default function DompetPintarPro() {
                       })
                     )}
                   </div>
-
                 </section>
               </div>
 
@@ -1450,7 +1462,7 @@ export default function DompetPintarPro() {
               </div>
             </div>
             {/* Export */}
-            <div className="bg-white dark:bg-[#111] rounded-2xl border border-slate-200/50 dark:border-slate-800/50 p-5">
+            <div className="bg-white dark:bg-[#111] rounded-2xl border border-slate-200/50 dark:border-slate-800/50 p-5 mb-10">
               <h3 className="text-sm font-black mb-3">Export Laporan</h3>
               <div className="flex gap-3">
                 <button onClick={exportPDF} className="flex-1 flex items-center justify-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-bold py-3 rounded-xl border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors text-sm"><FileText size={16} /> Export PDF</button>
@@ -1462,25 +1474,39 @@ export default function DompetPintarPro() {
         </div>{/* end content padding */}
       </div>{/* end main content */}
 
-      {/* ═══ MOBILE BOTTOM NAV ═══ */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-[#111]/90 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-800/60 px-2 pb-[env(safe-area-inset-bottom)]">
-        <div className="flex items-center justify-around py-2">
+      {/* ═══ MOBILE BOTTOM NAV REFINED ═══ */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-800/60 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
+        <div className="flex items-end justify-around py-2 px-1 relative">
+
           {[{ id: 'dashboard' as const, icon: Home, label: 'Beranda' }, { id: 'analytics' as const, icon: BarChart3, label: 'Analitik' }].map(item => (
-            <button key={item.id} onClick={() => setActiveView(item.id)} className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${activeView === item.id ? 'text-blue-600' : 'text-slate-400'}`}>
-              <item.icon size={20} /><span className="text-[10px] font-semibold">{item.label}</span>
+            <button key={item.id} onClick={() => setActiveView(item.id)} className={`flex flex-col items-center gap-1 p-2 min-w-[64px] rounded-xl transition-all duration-300 ${activeView === item.id ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
+              <div className={`transition-transform duration-300 ${activeView === item.id ? 'scale-110' : 'scale-100'}`}>
+                <item.icon size={22} strokeWidth={activeView === item.id ? 2.5 : 2} />
+              </div>
+              <span className={`text-[10px] tracking-wide transition-all ${activeView === item.id ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
             </button>
           ))}
-          <button onClick={() => setActiveView('transactions')} className="flex flex-col items-center -mt-5">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${activeView === 'transactions' ? 'bg-blue-600 shadow-blue-500/30' : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/20'}`}>
-              <Plus size={22} className="text-white" />
-            </div>
-            <span className="text-[10px] font-semibold text-slate-400 mt-0.5">Catat</span>
-          </button>
+
+          {/* CENTER FLOATING BUTTON */}
+          <div className="relative -top-6 px-2">
+            <button
+              onClick={() => setActiveView('transactions')}
+              className={`flex flex-col items-center justify-center w-14 h-14 rounded-full shadow-xl transition-all duration-300 active:scale-95 ${activeView === 'transactions' ? 'bg-blue-600 shadow-blue-500/40 ring-4 ring-blue-50 dark:ring-blue-900/30' : 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/30 border-2 border-white dark:border-[#0A0A0A]'}`}
+            >
+              <Plus size={24} strokeWidth={2.5} className="text-white" />
+            </button>
+            <span className={`absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] tracking-wide whitespace-nowrap transition-all ${activeView === 'transactions' ? 'font-bold text-blue-600 dark:text-blue-400' : 'font-medium text-slate-400'}`}>Catat</span>
+          </div>
+
           {[{ id: 'wallets' as const, icon: CreditCard, label: 'Dompet' }, { id: 'settings' as const, icon: Settings, label: 'Lainnya' }].map(item => (
-            <button key={item.id} onClick={() => { if (item.id === 'settings') setIsEditingSettings(true); else setActiveView(item.id); }} className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${activeView === item.id ? 'text-blue-600' : 'text-slate-400'}`}>
-              <item.icon size={20} /><span className="text-[10px] font-semibold">{item.label}</span>
+            <button key={item.id} onClick={() => { if (item.id === 'settings') setIsEditingSettings(true); else setActiveView(item.id); }} className={`flex flex-col items-center gap-1 p-2 min-w-[64px] rounded-xl transition-all duration-300 ${activeView === item.id || (item.id === 'settings' && isEditingSettings) ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
+              <div className={`transition-transform duration-300 ${activeView === item.id || (item.id === 'settings' && isEditingSettings) ? 'scale-110' : 'scale-100'}`}>
+                <item.icon size={22} strokeWidth={activeView === item.id || (item.id === 'settings' && isEditingSettings) ? 2.5 : 2} />
+              </div>
+              <span className={`text-[10px] tracking-wide transition-all ${activeView === item.id || (item.id === 'settings' && isEditingSettings) ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
             </button>
           ))}
+
         </div>
       </nav>
 
@@ -1523,7 +1549,6 @@ export default function DompetPintarPro() {
                   <span className="text-slate-400 text-xs font-medium">Ref ID</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] font-bold font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg text-slate-700 dark:text-slate-300">{selectedReceipt.id.split('-')[0].toUpperCase()}</span>
-                    {/* NEW: copy ref ID button */}
                     <button
                       onClick={() => { navigator.clipboard.writeText(selectedReceipt.id); showToast('Ref ID disalin!', 'success'); }}
                       className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
@@ -1605,7 +1630,6 @@ export default function DompetPintarPro() {
         </div>
       )}
 
-
     </div>
   );
 }
@@ -1614,7 +1638,6 @@ export default function DompetPintarPro() {
 function StatCard({ title, val, icon, color, bg }: any) {
   return (
     <div className="bg-white dark:bg-[#111] p-3.5 sm:p-4 rounded-[1.25rem] shadow-sm shadow-slate-200/40 dark:shadow-none border border-slate-100 dark:border-slate-800/50 flex flex-col gap-2.5 hover:scale-[1.02] transition-transform duration-300 cursor-pointer">
-      {/* Bagian Atas: Icon dan Judul */}
       <div className="flex items-center gap-2">
         <div className={`${bg} ${color} w-8 h-8 flex items-center justify-center rounded-[0.65rem] shrink-0`}>
           {icon}
@@ -1623,16 +1646,9 @@ function StatCard({ title, val, icon, color, bg }: any) {
           {title}
         </p>
       </div>
-
-      {/* Bagian Bawah: Angka (Bisa turun baris jika sangat panjang) */}
       <p className="text-[14px] sm:text-[15px] xl:text-[16px] font-black text-slate-900 dark:text-white tracking-tight leading-tight break-words">
         {val}
       </p>
     </div>
   );
-}
-
-// ── LIGHTBULB (used inline but declared here as fallback) ────────────────────
-function Lightbulb(props: any) {
-  return <Zap {...props} />;
 }
