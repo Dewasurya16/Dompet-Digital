@@ -11,7 +11,7 @@ import {
   Eye, EyeOff, Receipt, ShieldAlert, RefreshCw, Gem, Briefcase,
   AlertOctagon, CreditCard, MessageSquare, Landmark, Copy, CalendarSearch,
   TrendingUp, TrendingDown, BarChart3, PiggyBank, Check, Percent,
-  ChevronRight, Bell, Info, Zap, Home, LayoutGrid
+  ChevronRight, Bell, Info, Zap, Home, LayoutGrid, Camera // Ditambahkan Camera Icon
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import jsPDF from 'jspdf';
@@ -97,6 +97,9 @@ export default function DompetPintarPro() {
   const [isMounted, setIsMounted] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  // NEW STATE: Loading saat Scan Struk AI
+  const [isScanning, setIsScanning] = useState(false);
+
   const [transactions, setTransactions] = useState<any[]>([]);
   const [formData, setFormData] = useState({ title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai' });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -143,7 +146,6 @@ export default function DompetPintarPro() {
     setConfirmState(null);
   };
 
-  // ── NEW: Wallet breakdown tab ──
   const [activeTab, setActiveTab] = useState<'insights' | 'wallets'>('insights');
   const [activeView, setActiveView] = useState<'dashboard' | 'transactions' | 'analytics' | 'wallets' | 'settings'>('dashboard');
 
@@ -233,7 +235,18 @@ export default function DompetPintarPro() {
     if (isRegistering) {
       const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
       if (error) showToast(error.message, 'error');
-      else { showToast('Registrasi berhasil! Silakan masuk.', 'success'); setIsRegistering(false); }
+      else {
+        showToast('Registrasi berhasil! Silakan masuk.', 'success');
+        setIsRegistering(false);
+
+        // --- TAMBAHKAN KODE INI UNTUK EMAIL WELCOME ---
+        fetch('/api/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: authEmail, type: 'welcome' })
+        }).catch(console.error);
+        // ----------------------------------------------
+      }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
       if (error) showToast('Login Gagal: ' + error.message, 'error');
@@ -271,12 +284,61 @@ export default function DompetPintarPro() {
     else { showToast('Gagal mereset data.', 'error'); setIsSubmitting(false); }
   };
 
+  // ── FUNGSI BARU: SCAN STRUK DENGAN AI ──
+  const handleScanReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanning(true);
+    showToast("AI sedang membaca struk... 🤖", "info");
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = (reader.result as string).split(',')[1];
+      try {
+        const res = await fetch('/api/scan-receipt', {
+          method: 'POST',
+          body: JSON.stringify({ imageBase64: base64 })
+        });
+        const data = await res.json();
+
+        if (data.title) {
+          setFormData(prev => ({
+            ...prev,
+            title: data.title,
+            amount: data.amount.toString(),
+            category: data.category || 'Makanan',
+            type: 'pengeluaran'
+          }));
+          showToast("Struk berhasil dipindai! Silakan cek form.", "success");
+        } else {
+          showToast("Gagal membaca struk.", "error");
+        }
+      } catch (err) {
+        showToast("Terjadi kesalahan server.", "error");
+      }
+      setIsScanning(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Helper untuk Level Up Check
+  const getLevelInfoSync = (nw: number) => {
+    if (nw >= 50000000) return { title: 'Sultan', icon: '👑' };
+    if (nw >= 10000000) return { title: 'Master Hemat', icon: '💎' };
+    if (nw >= 2000000) return { title: 'Prajurit', icon: '🛡️' };
+    return { title: 'Pemula', icon: '🌱' };
+  };
+
   // ── MODIFIKASI: EMAIL TRIGGER DIMASUKKAN KE SINI ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.amount) return;
     setIsSubmitting(true);
     const payload = { title: formData.title, amount: Number(formData.amount), type: formData.type, category: formData.category, wallet: formData.wallet };
+
+    // Simpan Net Worth lama untuk cek Level Up
+    const oldNetWorth = stats.globalNetWorth;
 
     if (editingId) {
       const { error } = await supabase.from('transactions').update(payload).eq('id', editingId);
@@ -297,8 +359,8 @@ export default function DompetPintarPro() {
         fetchData();
         showToast('Transaksi berhasil disimpan! 🎉', 'success');
 
-        // Tembak API Route di Next.js untuk kirim notifikasi email struk
         if (session?.user?.email) {
+          // 1. Tembak API Route di Next.js untuk kirim notifikasi email struk
           fetch('/api/send-receipt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -313,6 +375,24 @@ export default function DompetPintarPro() {
               date: new Date(data.created_at).toLocaleString('id-ID')
             })
           }).catch(err => console.error('Gagal memicu pengiriman email struk:', err));
+
+          // 2. CEK LEVEL UP (Gamifikasi)
+          const newNetWorth = payload.type === 'pemasukan' ? oldNetWorth + payload.amount : oldNetWorth - payload.amount;
+          const oldLevel = getLevelInfoSync(oldNetWorth);
+          const newLevel = getLevelInfoSync(newNetWorth);
+
+          if (newLevel.title !== oldLevel.title && newNetWorth > oldNetWorth) {
+            fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: session.user.email,
+                type: 'levelup',
+                data: { newLevel: newLevel.title, icon: newLevel.icon }
+              })
+            }).catch(console.error);
+            showToast(`Selamat! Kamu naik level jadi ${newLevel.title}! 👑`, 'success');
+          }
         }
 
       } else showToast(`Gagal simpan: ${error?.message}`, 'error');
@@ -461,8 +541,8 @@ export default function DompetPintarPro() {
     return insights;
   }, [stats, catBudgets, filteredTransactions, aiPersonality]);
 
-  // ── Export ──
-  const exportPDF = () => {
+  // ── MODIFIKASI EXPORT (Dengan Fitur Email) ──
+  const exportPDF = async () => {
     const doc = new jsPDF();
     doc.setFillColor(37, 99, 235); doc.rect(0, 0, 210, 40, 'F');
     doc.setTextColor(255, 255, 255); doc.setFontSize(22); doc.setFont("helvetica", "bold"); doc.text("Laporan Keuangan", 14, 22);
@@ -485,18 +565,45 @@ export default function DompetPintarPro() {
     });
     const pageCount = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(148, 163, 184); doc.text(`Halaman ${i} dari ${pageCount} — Dompet Digital`, 105, 285, { align: 'center' }); }
-    doc.save(`Laporan_Keuangan_${Date.now()}.pdf`);
+
+    const filename = `Laporan_Keuangan_${Date.now()}.pdf`;
+    doc.save(filename);
     showToast('PDF berhasil diunduh!', 'success');
+
+    // Tawarkan kirim ke email
+    const wantEmail = await confirm('Kirim ke Email?', 'Apakah kamu ingin salinan PDF laporan ini dikirim ke emailmu?');
+    if (wantEmail && session?.user?.email) {
+      showToast('Mengirim email...', 'info');
+      const base64Data = doc.output('datauristring').split(',')[1];
+      fetch('/api/send-notification', {
+        method: 'POST', body: JSON.stringify({ email: session.user.email, type: 'report', filename, attachmentBase64: base64Data })
+      }).then(() => showToast('Laporan PDF berhasil dikirim ke email!', 'success')).catch(() => showToast('Gagal kirim email', 'error'));
+    }
   };
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
     const headers = ['Tanggal', 'Keterangan', 'Sumber Dana', 'Kategori', 'Tipe', 'Jumlah (Rp)'];
     const rows = filteredTransactions.map(t => [new Date(t.created_at).toLocaleDateString('id-ID'), t.title.replace(/,/g, ''), t.wallet || 'Tunai', t.category, t.type, t.amount]);
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent); const link = document.createElement("a");
-    link.setAttribute("href", encodedUri); link.setAttribute("download", `Data_Keuangan_${new Date().toLocaleDateString('id-ID')}.csv`);
+    const pureCsv = headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
+    const csvContent = "data:text/csv;charset=utf-8," + pureCsv;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    const filename = `Data_Keuangan_${new Date().toLocaleDateString('id-ID')}.csv`;
+
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
     showToast('CSV berhasil diunduh!', 'success');
+
+    // Tawarkan kirim ke email
+    const wantEmail = await confirm('Kirim ke Email?', 'Apakah kamu ingin salinan data CSV ini dikirim ke emailmu?');
+    if (wantEmail && session?.user?.email) {
+      showToast('Mengirim email...', 'info');
+      const base64Data = btoa(unescape(encodeURIComponent(pureCsv)));
+      fetch('/api/send-notification', {
+        method: 'POST', body: JSON.stringify({ email: session.user.email, type: 'report', filename, attachmentBase64: base64Data })
+      }).then(() => showToast('Data CSV berhasil dikirim ke email!', 'success')).catch(() => showToast('Gagal kirim email', 'error'));
+    }
   };
 
   if (!isMounted) return null;
@@ -886,7 +993,7 @@ export default function DompetPintarPro() {
             </div>
 
             {/* Recent Transactions (Dashboard compact view) */}
-            <div className="bg-white dark:bg-[#111] rounded-[1.5rem] shadow-sm shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-800/50 overflow-hidden p-6">
+            <div className="bg-white dark:bg-[#111] rounded-[1.5rem] shadow-sm shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-800/50 overflow-hidden p-6 mt-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="font-bold text-[17px] text-slate-900 dark:text-white tracking-tight">Transactions</h3>
                 <button onClick={() => setActiveView('transactions')} className="text-slate-800 dark:text-white hover:opacity-70"><ArrowRight size={20} /></button>
@@ -939,9 +1046,18 @@ export default function DompetPintarPro() {
                       </div>
                     )}
                     <div className="flex items-end justify-between mb-6">
-                      <h2 className="text-[20px] font-bold text-slate-900 dark:text-white tracking-tight leading-none">
-                        Operation
-                      </h2>
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-[20px] font-bold text-slate-900 dark:text-white tracking-tight leading-none">
+                          Operation
+                        </h2>
+                        {/* TOMBOL AI SCANNER (Baru!) */}
+                        <div className="ml-2">
+                          <input type="file" accept="image/*" id="scan-receipt" className="hidden" onChange={handleScanReceipt} disabled={isScanning} />
+                          <label htmlFor="scan-receipt" className="cursor-pointer flex items-center gap-1.5 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1.5 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all">
+                            {isScanning ? <><Loader2 className="animate-spin inline" size={14} /> Membaca AI...</> : <><Camera size={14} /> Scan AI</>}
+                          </label>
+                        </div>
+                      </div>
                       <div className="flex gap-4 text-[13px] font-bold text-slate-500">
                         <button type="button" onClick={() => setFormData({ ...formData, type: 'pengeluaran' })} className={`pb-1 border-b-2 transition-colors ${formData.type === 'pengeluaran' ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white' : 'border-transparent hover:text-slate-700'}`}>Kirim</button>
                         <button type="button" onClick={() => setFormData({ ...formData, type: 'pemasukan' })} className={`pb-1 border-b-2 transition-colors ${formData.type === 'pemasukan' ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white' : 'border-transparent hover:text-slate-700'}`}>Terima</button>
@@ -1024,7 +1140,6 @@ export default function DompetPintarPro() {
                       <div className="flex flex-1 items-center bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 focus-within:ring-2 ring-blue-500/20 shadow-sm transition-all gap-2">
                         <Search size={15} className="text-slate-400 shrink-0" />
                         <input type="text" placeholder="Cari transaksi, kategori, rekening..." className="bg-transparent outline-none w-full text-sm text-slate-700 dark:text-slate-200" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-                        {/* NEW: clear search button */}
                         {searchQuery && <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={14} /></button>}
                       </div>
                       <div className="flex items-center bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm gap-2 w-full sm:w-auto">

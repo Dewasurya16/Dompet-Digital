@@ -49,9 +49,12 @@ export async function POST(req: Request) {
                 
                 <!-- Sapaan Friendly -->
                 <div style="text-align: center; margin-bottom: 30px;">
-                  <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #3B82F6, #6366F1); border-radius: 18px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; line-height: 56px; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);">
-                    👛
+                  
+                  <!-- PERBAIKAN ICON: Menggunakan text-align dan line-height agar pasti di tengah -->
+                  <div style="width: 56px; height: 56px; background: linear-gradient(135deg, #3B82F6, #6366F1); border-radius: 18px; margin: 0 auto 16px; text-align: center; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);">
+                    <span style="font-size: 28px; line-height: 56px; display: inline-block; vertical-align: middle; margin: 0;">👛</span>
                   </div>
+
                   <h2 style="margin: 0 0 8px 0; color: #0F172A; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">
                     HALOO, ${displayName}! 👋
                   </h2>
