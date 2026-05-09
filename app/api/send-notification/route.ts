@@ -4,6 +4,10 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Helper untuk format Rupiah di dalam email
+const formatIDR = (amount: number) =>
+    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
+
 export async function POST(req: Request) {
     try {
         const { email, type, data, attachmentBase64, filename } = await req.json();
@@ -65,6 +69,33 @@ export async function POST(req: Request) {
             if (attachmentBase64) {
                 attachments.push({ filename, content: attachmentBase64 });
             }
+        }
+        // 4. Peringatan Budget Jebol (AI Alert)
+        else if (type === 'budget_alert') {
+            const { category, spent, limit, personality } = data;
+            const remaining = limit - spent;
+            const remainingText = remaining >= 0 ? `Sisa <strong>${formatIDR(remaining)}</strong>` : `Malah minus <strong>${formatIDR(Math.abs(remaining))}</strong>`;
+
+            const isRoast = personality === 'roasting';
+
+            subject = isRoast
+                ? `🚨 Woy! Jatah ${category} Lu Udah Sekarat!`
+                : `⚠️ Peringatan: Anggaran ${category} Menipis`;
+
+            const roastText = `Gaya elit ekonomi sulit! Lu udah abisin <strong>${formatIDR(spent)}</strong> buat ${category} bulan ini. Limit lu cuma <strong>${formatIDR(limit)}</strong>. ${remainingText} doang, mau makan angin lu akhir bulan? Mending ngerem dari sekarang deh!`;
+
+            const motivatorText = `Halo ${displayName}, sekadar mengingatkan bahwa pengeluaranmu untuk kategori <strong>${category}</strong> sudah mencapai <strong>${formatIDR(spent)}</strong> dari batas anggaran <strong>${formatIDR(limit)}</strong>. ${remainingText}. Yuk, lebih bijak lagi mengerem pengeluaran agar target menabungmu tetap tercapai! Kamu pasti bisa! 💪`;
+
+            htmlContent = `
+            <div style="${baseStyle}">
+                <div style="background: ${isRoast ? 'linear-gradient(135deg, #E11D48, #9F1239)' : 'linear-gradient(135deg, #F59E0B, #D97706)'}; padding: 40px 20px;">
+                    <div style="font-size: 40px; margin-bottom: 10px;">${isRoast ? '🔥' : '🎯'}</div>
+                    <h1 style="color: #FFFFFF; margin: 0; font-size: 24px; font-weight: 800;">${isRoast ? 'REM WOY!' : 'Perhatian Anggaran'}</h1>
+                </div>
+                <div style="padding: 30px; line-height: 1.6;">
+                    <p style="margin: 0 0 15px 0; font-size: 15px; color: #475569;">${isRoast ? roastText : motivatorText}</p>
+                </div>
+            </div>`;
         }
 
         const { error } = await resend.emails.send({

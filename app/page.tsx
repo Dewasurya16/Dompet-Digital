@@ -11,7 +11,7 @@ import {
   Eye, EyeOff, Receipt, ShieldAlert, RefreshCw, Gem, Briefcase,
   AlertOctagon, CreditCard, MessageSquare, Landmark, Copy, CalendarSearch,
   TrendingUp, TrendingDown, BarChart3, PiggyBank, Check, Percent,
-  ChevronRight, Bell, Info, Zap, Home, LayoutGrid, Camera, Lightbulb
+  ChevronRight, Bell, Info, Zap, Home, LayoutGrid, Camera, Lightbulb, MapPin
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import jsPDF from 'jspdf';
@@ -22,6 +22,7 @@ const formatIDR = (amount: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 
 const parseMonthSafe = (ym: string) => new Date(`${ym}-15`); // FIX: timezone-safe
+const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 
 const CATEGORY_COLORS: any = {
   'Makanan': '#F59E0B', 'Transportasi': '#3B82F6', 'Tagihan': '#EF4444',
@@ -33,6 +34,7 @@ const CATEGORY_COLORS: any = {
 };
 
 const WALLET_OPTIONS = ['Kas Tunai', 'Mandiri', 'BRI', 'BCA', 'BNI', 'BSI', 'GoPay', 'OVO', 'DANA', 'Lainnya'];
+const DEFAULT_FORM = { title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai', image_url: '', person_name: '', currency: 'IDR', original_amount: '', latitude: null as number | null, longitude: null as number | null };
 
 // ─── TOAST SYSTEM ──────────────────────────────────────────────────────────────
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -102,16 +104,30 @@ export default function DompetPintarPro() {
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
 
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [formData, setFormData] = useState({ title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai' });
+  const [formData, setFormData] = useState<any>(DEFAULT_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [initialBalance, setInitialBalance] = useState<number | string>(0);
   const [targetSaving, setTargetSaving] = useState<number | string>(25000000);
   const [catBudgets, setCatBudgets] = useState<any>({ Makanan: '', Transportasi: '', Tagihan: '', Belanja: '', Hiburan: '', Lainnya: '' });
 
+  // NEW PHASE 3 STATES
+  const [pockets, setPockets] = useState<any[]>([]);
+  const [investments, setInvestments] = useState<any[]>([]);
+  const [appTheme, setAppTheme] = useState('default');
+
+  // Modal States
+  const [showPocketModal, setShowPocketModal] = useState(false);
+  const [showInvestModal, setShowInvestModal] = useState(false);
+  const [pocketForm, setPocketForm] = useState({ name: '', icon: '🎯', target_amount: '', balance: '' });
+  const [investForm, setInvestForm] = useState({ name: '', asset_type: 'Saham', platform: '', invested_amount: '', current_value: '' });
+  const [isSavingPocket, setIsSavingPocket] = useState(false);
+  const [isSavingInvest, setIsSavingInvest] = useState(false);
+
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [useLocation, setUseLocation] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const [filterMode, setFilterMode] = useState('month');
@@ -130,10 +146,10 @@ export default function DompetPintarPro() {
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+    setToasts((prev: any) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev: any) => prev.filter((t: any) => t.id !== id)), 4000);
   }, []);
-  const dismissToast = useCallback((id: number) => setToasts(prev => prev.filter(t => t.id !== id)), []);
+  const dismissToast = useCallback((id: number) => setToasts((prev: any) => prev.filter((t: any) => t.id !== id)), []);
 
   const confirm = useCallback((title: string, message: string, danger = false): Promise<boolean> => {
     return new Promise(resolve => {
@@ -151,8 +167,14 @@ export default function DompetPintarPro() {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
-    if (!error && data) setTransactions(data);
+    const [txRes, pocketsRes, invRes] = await Promise.all([
+      supabase.from('transactions').select('*').order('created_at', { ascending: false }),
+      supabase.from('pockets').select('*').order('created_at', { ascending: false }),
+      supabase.from('investments').select('*').order('created_at', { ascending: false })
+    ]);
+    if (!txRes.error && txRes.data) setTransactions(txRes.data);
+    if (!pocketsRes.error && pocketsRes.data) setPockets(pocketsRes.data);
+    if (!invRes.error && invRes.data) setInvestments(invRes.data);
     setLoading(false);
   };
 
@@ -172,6 +194,7 @@ export default function DompetPintarPro() {
     const savedTarget = localStorage.getItem('fin_targetSaving');
     const savedBudgets = localStorage.getItem('fin_catBudgets');
     const savedTheme = localStorage.getItem('fin_theme');
+    const savedAppTheme = localStorage.getItem('fin_app_theme');
     const savedPrivacy = localStorage.getItem('fin_privacy');
     const savedPersonality = localStorage.getItem('fin_ai_personality');
 
@@ -179,6 +202,7 @@ export default function DompetPintarPro() {
     if (savedTarget) setTargetSaving(Number(savedTarget));
     if (savedBudgets) setCatBudgets(JSON.parse(savedBudgets));
     if (savedTheme === 'dark') setIsDarkMode(true);
+    if (savedAppTheme) setAppTheme(savedAppTheme);
     if (savedPrivacy === 'hidden') setShowBalance(false);
     if (savedPersonality) setAiPersonality(savedPersonality);
 
@@ -195,6 +219,12 @@ export default function DompetPintarPro() {
     else { document.documentElement.classList.remove('dark'); localStorage.setItem('fin_theme', 'light'); }
   }, [isDarkMode, isMounted]);
 
+  useEffect(() => {
+    if (!isMounted) return;
+    document.documentElement.setAttribute('data-theme', appTheme);
+    localStorage.setItem('fin_app_theme', appTheme);
+  }, [appTheme, isMounted]);
+
   const togglePrivacy = () => { const nv = !showBalance; setShowBalance(nv); localStorage.setItem('fin_privacy', nv ? 'visible' : 'hidden'); };
   const toggleAIPersonality = () => { const nv = aiPersonality === 'motivator' ? 'roasting' : 'motivator'; setAiPersonality(nv); localStorage.setItem('fin_ai_personality', nv); };
   const displayMoney = (amount: number) => showBalance ? formatIDR(amount) : 'Rp ••••••';
@@ -207,25 +237,25 @@ export default function DompetPintarPro() {
     if (editingId) return;
     if (formData.type === 'pengeluaran' && formData.title) {
       const t = formData.title.toLowerCase();
-      if (t.includes('emas') || t.includes('saham') || t.includes('reksadana') || t.includes('crypto') || t.includes('bibit') || t.includes('deposito')) setFormData(prev => ({ ...prev, category: 'Investasi' }));
-      else if (t.includes('makan') || t.includes('minum') || t.includes('kopi') || t.includes('kfc') || t.includes('mcd') || t.includes('gofood') || t.includes('bakso') || t.includes('warteg')) setFormData(prev => ({ ...prev, category: 'Makanan' }));
-      else if (t.includes('bensin') || t.includes('parkir') || t.includes('gojek') || t.includes('grab') || t.includes('tol') || t.includes('kereta') || t.includes('ojol')) setFormData(prev => ({ ...prev, category: 'Transportasi' }));
-      else if (t.includes('listrik') || t.includes('air') || t.includes('wifi') || t.includes('pulsa') || t.includes('bpjs') || t.includes('cicilan') || t.includes('netflix') || t.includes('spotify') || t.includes('kos')) setFormData(prev => ({ ...prev, category: 'Tagihan' }));
-      else if (t.includes('shopee') || t.includes('tokopedia') || t.includes('baju') || t.includes('skincare') || t.includes('belanja')) setFormData(prev => ({ ...prev, category: 'Belanja' }));
-      else if (t.includes('nonton') || t.includes('game') || t.includes('bioskop') || t.includes('liburan')) setFormData(prev => ({ ...prev, category: 'Hiburan' }));
-      else if (t.includes('sppd') || t.includes('dinas') || t.includes('tugas luar') || t.includes('hotel')) setFormData(prev => ({ ...prev, category: 'SPPD' }));
-      else if (t.includes('pinjemin') || t.includes('kasih utang') || t.includes('talangin')) setFormData(prev => ({ ...prev, category: 'Beri Hutang' }));
-      else if (t.includes('bayar utang') || t.includes('lunasin pinjaman') || t.includes('bayar pinjaman')) setFormData(prev => ({ ...prev, category: 'Bayar Pinjaman' }));
+      if (t.includes('emas') || t.includes('saham') || t.includes('reksadana') || t.includes('crypto') || t.includes('bibit') || t.includes('deposito')) setFormData((prev: any) => ({ ...prev, category: 'Investasi' }));
+      else if (t.includes('makan') || t.includes('minum') || t.includes('kopi') || t.includes('kfc') || t.includes('mcd') || t.includes('gofood') || t.includes('bakso') || t.includes('warteg')) setFormData((prev: any) => ({ ...prev, category: 'Makanan' }));
+      else if (t.includes('bensin') || t.includes('parkir') || t.includes('gojek') || t.includes('grab') || t.includes('tol') || t.includes('kereta') || t.includes('ojol')) setFormData((prev: any) => ({ ...prev, category: 'Transportasi' }));
+      else if (t.includes('listrik') || t.includes('air') || t.includes('wifi') || t.includes('pulsa') || t.includes('bpjs') || t.includes('cicilan') || t.includes('netflix') || t.includes('spotify') || t.includes('kos')) setFormData((prev: any) => ({ ...prev, category: 'Tagihan' }));
+      else if (t.includes('shopee') || t.includes('tokopedia') || t.includes('baju') || t.includes('skincare') || t.includes('belanja')) setFormData((prev: any) => ({ ...prev, category: 'Belanja' }));
+      else if (t.includes('nonton') || t.includes('game') || t.includes('bioskop') || t.includes('liburan')) setFormData((prev: any) => ({ ...prev, category: 'Hiburan' }));
+      else if (t.includes('sppd') || t.includes('dinas') || t.includes('tugas luar') || t.includes('hotel')) setFormData((prev: any) => ({ ...prev, category: 'SPPD' }));
+      else if (t.includes('pinjemin') || t.includes('kasih utang') || t.includes('talangin')) setFormData((prev: any) => ({ ...prev, category: 'Beri Hutang' }));
+      else if (t.includes('bayar utang') || t.includes('lunasin pinjaman') || t.includes('bayar pinjaman')) setFormData((prev: any) => ({ ...prev, category: 'Bayar Pinjaman' }));
     } else if (formData.type === 'pemasukan' && formData.title) {
       const t = formData.title.toLowerCase();
-      if (t.includes('gaji') || t.includes('upah') || t.includes('gapok')) setFormData(prev => ({ ...prev, category: 'Gaji Pokok' }));
-      else if (t.includes('tukin') || t.includes('tunjangan') || t.includes('remunerasi')) setFormData(prev => ({ ...prev, category: 'Tukin' }));
-      else if (t.includes('uang makan') || t.includes('uang lauk')) setFormData(prev => ({ ...prev, category: 'Uang Makan' }));
-      else if (t.includes('sppd') || t.includes('uang dinas')) setFormData(prev => ({ ...prev, category: 'SPPD' }));
-      else if (t.includes('bonus') || t.includes('thr') || t.includes('hadiah')) setFormData(prev => ({ ...prev, category: 'Bonus' }));
-      else if (t.includes('jual') || t.includes('profit') || t.includes('cair')) setFormData(prev => ({ ...prev, category: 'Investasi' }));
-      else if (t.includes('dibayar utang') || t.includes('kembalian utang')) setFormData(prev => ({ ...prev, category: 'Dibayar Hutang' }));
-      else if (t.includes('dapat pinjaman') || t.includes('pinjam uang') || t.includes('ngutang')) setFormData(prev => ({ ...prev, category: 'Terima Pinjaman' }));
+      if (t.includes('gaji') || t.includes('upah') || t.includes('gapok')) setFormData((prev: any) => ({ ...prev, category: 'Gaji Pokok' }));
+      else if (t.includes('tukin') || t.includes('tunjangan') || t.includes('remunerasi')) setFormData((prev: any) => ({ ...prev, category: 'Tukin' }));
+      else if (t.includes('uang makan') || t.includes('uang lauk')) setFormData((prev: any) => ({ ...prev, category: 'Uang Makan' }));
+      else if (t.includes('sppd') || t.includes('uang dinas')) setFormData((prev: any) => ({ ...prev, category: 'SPPD' }));
+      else if (t.includes('bonus') || t.includes('thr') || t.includes('hadiah')) setFormData((prev: any) => ({ ...prev, category: 'Bonus' }));
+      else if (t.includes('jual') || t.includes('profit') || t.includes('cair')) setFormData((prev: any) => ({ ...prev, category: 'Investasi' }));
+      else if (t.includes('dibayar utang') || t.includes('kembalian utang')) setFormData((prev: any) => ({ ...prev, category: 'Dibayar Hutang' }));
+      else if (t.includes('dapat pinjaman') || t.includes('pinjam uang') || t.includes('ngutang')) setFormData((prev: any) => ({ ...prev, category: 'Terima Pinjaman' }));
     }
   }, [formData.title, formData.type, editingId]);
 
@@ -299,6 +329,17 @@ export default function DompetPintarPro() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = (reader.result as string).split(',')[1];
+      
+      let publicImageUrl = '';
+      try {
+        const fileName = `receipt-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage.from('receipts').upload(fileName, file);
+        if (!uploadError && uploadData) {
+          const { data: publicUrlData } = supabase.storage.from('receipts').getPublicUrl(uploadData.path);
+          publicImageUrl = publicUrlData.publicUrl;
+        }
+      } catch(e) { console.error('Upload fail', e); }
+
       try {
         const res = await fetch('/api/scan-receipt', {
           method: 'POST',
@@ -311,12 +352,13 @@ export default function DompetPintarPro() {
         const data = await res.json();
 
         if (res.ok && data.title) {
-          setFormData(prev => ({
+          setFormData((prev: any) => ({
             ...prev,
             title: data.title,
             amount: data.amount.toString(),
             category: data.category || 'Makanan',
-            type: 'pengeluaran'
+            type: 'pengeluaran',
+            image_url: publicImageUrl
           }));
           showToast("Struk berhasil dipindai! Silakan cek form.", "success");
         } else {
@@ -342,7 +384,16 @@ export default function DompetPintarPro() {
     e.preventDefault();
     if (!formData.title || !formData.amount) return;
     setIsSubmitting(true);
-    const payload = { title: formData.title, amount: Number(formData.amount), type: formData.type, category: formData.category, wallet: formData.wallet };
+    
+    let lat = formData.latitude, lng = formData.longitude;
+    if (useLocation && !lat && !lng) {
+      try {
+        const pos = await new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 }));
+        lat = pos.coords.latitude; lng = pos.coords.longitude;
+      } catch (err) { console.warn("Location disabled or timed out"); }
+    }
+
+    const payload = { title: formData.title, amount: Number(formData.amount), type: formData.type, category: formData.category, wallet: formData.wallet, image_url: formData.image_url, person_name: formData.person_name, currency: formData.currency, original_amount: formData.original_amount ? Number(formData.original_amount) : null, latitude: lat, longitude: lng };
 
     const oldNetWorth = stats.globalNetWorth;
 
@@ -352,7 +403,8 @@ export default function DompetPintarPro() {
       if (!error) {
         setEditingId(null);
         setReceiptPreview(null);
-        setFormData({ title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai' });
+        setFormData(DEFAULT_FORM);
+        setUseLocation(false);
         fetchData();
         showToast('Transaksi berhasil diperbarui!', 'success');
       } else showToast(`Gagal update: ${error.message}`, 'error');
@@ -361,7 +413,8 @@ export default function DompetPintarPro() {
       setIsSubmitting(false);
 
       if (!error && data) {
-        setFormData({ title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai' });
+        setFormData(DEFAULT_FORM);
+        setUseLocation(false);
         setReceiptPreview(null);
         fetchData();
         showToast('Transaksi berhasil disimpan! 🎉', 'success');
@@ -402,7 +455,8 @@ export default function DompetPintarPro() {
   const handleEditClick = (t: any) => {
     setEditingId(t.id);
     setReceiptPreview(null);
-    setFormData({ title: t.title, amount: t.amount.toString(), type: t.type, category: t.category, wallet: t.wallet || 'Kas Tunai' });
+    setFormData({ ...DEFAULT_FORM, title: t.title, amount: t.amount.toString(), type: t.type, category: t.category, wallet: t.wallet || 'Kas Tunai', image_url: t.image_url || '', person_name: t.person_name || '', currency: t.currency || 'IDR', original_amount: t.original_amount ? t.original_amount.toString() : '', latitude: t.latitude || null, longitude: t.longitude || null });
+    setUseLocation(!!t.latitude);
     document.getElementById('formCatat')?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -417,17 +471,75 @@ export default function DompetPintarPro() {
   const handleCancelEdit = () => {
     setEditingId(null);
     setReceiptPreview(null);
-    setFormData({ title: '', amount: '', type: 'pengeluaran', category: 'Makanan', wallet: 'Kas Tunai' });
+    setFormData(DEFAULT_FORM);
+    setUseLocation(false);
   };
 
   const handleDuplicate = async (t: any) => {
     const ok = await confirm('Duplikat Transaksi', `Gunakan "${t.title}" sebagai template pencatatan baru?`);
     if (!ok) return;
-    setFormData({ title: t.title, amount: t.amount.toString(), type: t.type, category: t.category, wallet: t.wallet || 'Kas Tunai' });
+    setFormData({ ...DEFAULT_FORM, title: t.title, amount: t.amount.toString(), type: t.type, category: t.category, wallet: t.wallet || 'Kas Tunai', image_url: t.image_url || '', person_name: t.person_name || '', currency: t.currency || 'IDR', original_amount: t.original_amount ? t.original_amount.toString() : '' });
     setEditingId(null);
     setReceiptPreview(null);
     document.getElementById('formCatat')?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  const handleQuickPay = async (t: any) => {
+    const ok = await confirm('Bayar Lagi', `Catat otomatis tagihan "${t.title}" sebesar ${formatIDR(Number(t.amount))} untuk hari ini?`);
+    if (!ok) return;
+    setIsSubmitting(true);
+    const payload = { title: t.title, amount: Number(t.amount), type: t.type, category: t.category, wallet: t.wallet };
+    const { error } = await supabase.from('transactions').insert([payload]);
+    setIsSubmitting(false);
+    if (!error) {
+      fetchData();
+      showToast(`Tagihan ${t.title} berhasil dicatat!`, 'success');
+    } else {
+      showToast('Gagal mencatat tagihan: ' + error.message, 'error');
+    }
+  };
+
+  const handleSavePocket = async () => {
+    if (!pocketForm.name || !pocketForm.target_amount) return showToast('Nama dan Target wajib diisi!', 'warning');
+    setIsSavingPocket(true);
+    const { error } = await supabase.from('pockets').insert([{
+      name: pocketForm.name, icon: pocketForm.icon,
+      target_amount: Number(pocketForm.target_amount),
+      balance: Number(pocketForm.balance || 0),
+      user_id: session?.user?.id
+    }]);
+    setIsSavingPocket(false);
+    if (!error) {
+      setShowPocketModal(false);
+      setPocketForm({ name: '', icon: '🎯', target_amount: '', balance: '' });
+      fetchData();
+      showToast('Kantong tabungan berhasil dibuat! 🎯', 'success');
+    } else showToast('Gagal membuat kantong: ' + error.message, 'error');
+  };
+
+  const handleSaveInvest = async () => {
+    if (!investForm.name || !investForm.invested_amount || !investForm.current_value) return showToast('Semua field wajib diisi!', 'warning');
+    setIsSavingInvest(true);
+    const { error } = await supabase.from('investments').insert([{
+      asset_name: investForm.name,
+      asset_type: investForm.asset_type,
+      platform: investForm.platform || '',
+      amount: Number(investForm.invested_amount),
+      purchase_price: Number(investForm.invested_amount),
+      invested_amount: Number(investForm.invested_amount),
+      current_value: Number(investForm.current_value),
+      current_price: Number(investForm.current_value),
+      user_id: session?.user?.id
+    }]);
+    setIsSavingInvest(false);
+    if (!error) {
+      setShowInvestModal(false);
+      setInvestForm({ name: '', asset_type: 'Saham', platform: '', invested_amount: '', current_value: '' });
+      fetchData();
+      showToast('Aset investasi berhasil ditambahkan! 📈', 'success');
+    } else showToast('Gagal menyimpan aset: ' + error.message, 'error');
+  };
+
 
   const availableMonths = useMemo(() => {
     const months = new Set(transactions.map(t => {
@@ -502,6 +614,37 @@ export default function DompetPintarPro() {
       .sort((a, b) => b.balance - a.balance);
   }, [transactions]);
 
+  const debtTracker = useMemo(() => {
+    const personMap: Record<string, { given: number; received: number }> = {};
+    transactions.forEach(t => {
+      if (t.person_name && ['Beri Hutang', 'Bayar Pinjaman', 'Terima Pinjaman', 'Dibayar Hutang'].includes(t.category)) {
+        const p = t.person_name.trim().toLowerCase();
+        if (!personMap[p]) personMap[p] = { given: 0, received: 0 };
+        if (t.category === 'Beri Hutang' || t.category === 'Bayar Pinjaman') personMap[p].given += Number(t.amount);
+        if (t.category === 'Terima Pinjaman' || t.category === 'Dibayar Hutang') personMap[p].received += Number(t.amount);
+      }
+    });
+    return Object.entries(personMap).map(([name, v]) => ({
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      net: v.given - v.received
+    })).filter(x => x.net !== 0).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  }, [transactions]);
+
+  const heatmapData = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const daysInMonth = getDaysInMonth(year, month);
+    
+    const data = [];
+    for (let i = 1; i <= daysInMonth; i++) {
+        const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        const expenses = transactions.filter(t => t.type === 'pengeluaran' && t.created_at.startsWith(dateStr)).reduce((sum, t) => sum + Number(t.amount), 0);
+        data.push({ date: i, amount: expenses });
+    }
+    return data;
+  }, [transactions]);
+
   const userLevel = useMemo(() => {
     const nw = stats.globalNetWorth;
     if (nw >= 50000000) return { title: 'Sultan', icon: '👑', color: 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800' };
@@ -509,6 +652,21 @@ export default function DompetPintarPro() {
     if (nw >= 2000000) return { title: 'Prajurit', icon: '🛡️', color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800' };
     return { title: 'Pemula', icon: '🌱', color: 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' };
   }, [stats.globalNetWorth]);
+
+  const gamification = useMemo(() => {
+    let streak = 0;
+    const now = new Date();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const hasExpense = transactions.some(t => t.type === 'pengeluaran' && t.created_at.startsWith(dateStr));
+      if (!hasExpense) streak++;
+      else break;
+    }
+    const isIronSaver = stats.savingsRate >= 30;
+    return { streak, isIronSaver };
+  }, [transactions, stats.savingsRate]);
 
   const categoryChartData = useMemo(() => {
     const expenses = filteredTransactions.filter(t => t.type === 'pengeluaran' && !['Investasi', 'Beri Hutang', 'Bayar Pinjaman'].includes(t.category));
@@ -598,6 +756,18 @@ export default function DompetPintarPro() {
         method: 'POST', body: JSON.stringify({ email: session.user.email, type: 'report', filename, attachmentBase64: base64Data })
       }).then(() => showToast('Data CSV berhasil dikirim ke email!', 'success')).catch(() => showToast('Gagal kirim email', 'error'));
     }
+  };
+
+  const exportWA = () => {
+    const text = `📊 *Laporan Keuangan Dompet Digital*\n\n` +
+      `💰 Saldo Kas: ${formatIDR(stats.balance)}\n` +
+      `📈 Pemasukan: ${formatIDR(stats.income)}\n` +
+      `📉 Pengeluaran: ${formatIDR(stats.expense)}\n` +
+      `💎 Total Kekayaan: ${formatIDR(stats.netWorth)}\n` +
+      `⭐ Saving Rate: ${stats.savingsRate}%\n\n` +
+      `_Laporan dibuat pada ${new Date().toLocaleDateString('id-ID')}._`;
+    const encoded = encodeURIComponent(text);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
   };
 
   if (!isMounted) return null;
@@ -757,6 +927,11 @@ export default function DompetPintarPro() {
           <p className="text-center font-bold text-sm text-slate-800 dark:text-white">{displayUsername}</p>
           <div className="flex justify-center mt-1.5">
             <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${userLevel.color}`}>{userLevel.icon} {userLevel.title}</span>
+          </div>
+          {/* Badges */}
+          <div className="flex justify-center gap-1.5 mt-2.5">
+            {gamification.streak >= 3 && <div className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 bg-amber-100 text-amber-600 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800" title={`${gamification.streak} No Spend Days`}><Zap size={10} /> {gamification.streak} Day Streak</div>}
+            {gamification.isIronSaver && <div className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800" title="Saving Rate >= 30%"><ShieldAlert size={10} className="text-emerald-500"/> Iron Saver</div>}
           </div>
         </div>
 
@@ -985,6 +1160,30 @@ export default function DompetPintarPro() {
               </div>
             </div>
 
+            {/* Financial Heatmap */}
+            <div className="bg-white dark:bg-[#111] rounded-[1.5rem] shadow-sm border border-slate-200/50 dark:border-slate-800/50 p-6 mb-6">
+              <h3 className="font-bold text-[17px] text-slate-900 dark:text-white mb-4 flex items-center gap-2"><Calendar className="text-blue-500" size={18} /> Kalender Keuangan (Bulan Ini)</h3>
+              <div className="flex gap-1.5 overflow-x-auto pb-2 custom-scrollbar">
+                {heatmapData.map((d, i) => {
+                  let colorClass = 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'; // No spend
+                  if (d.amount === 0) colorClass = 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800 text-emerald-500'; // Green (No spend day)
+                  else if (d.amount < 50000) colorClass = 'bg-amber-100 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 text-amber-500'; // Light spend
+                  else if (d.amount < 200000) colorClass = 'bg-orange-100 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800 text-orange-500'; // Medium spend
+                  else colorClass = 'bg-rose-100 dark:bg-rose-900/30 border-rose-200 dark:border-rose-800 text-rose-500'; // High spend
+                  
+                  return (
+                    <div key={i} className={`w-8 h-8 sm:w-10 sm:h-10 shrink-0 rounded-lg flex items-center justify-center border text-[10px] sm:text-xs font-bold transition-all hover:scale-110 cursor-help ${colorClass}`} title={`Tanggal ${d.date}: ${formatIDR(d.amount)}`}>
+                      {d.date}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-3 text-[10px] font-medium text-slate-400 mt-3">
+                <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800"></div> No Spend Day</span>
+                <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-sm bg-rose-100 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800"></div> Pengeluaran Besar</span>
+              </div>
+            </div>
+
             {/* Recent Transactions (Dashboard compact view) */}
             <div className="bg-white dark:bg-[#111] rounded-[1.5rem] shadow-sm shadow-slate-200/50 dark:shadow-none border border-slate-200/50 dark:border-slate-800/50 overflow-hidden p-6">
               <div className="flex items-center justify-between mb-6">
@@ -1099,12 +1298,18 @@ export default function DompetPintarPro() {
                         <label className="text-[12px] font-bold text-slate-500 mb-2 block">Tujuan & Nominal</label>
                         <div className="flex flex-col sm:flex-row items-center bg-slate-50 dark:bg-[#1A1A1A] rounded-[1.25rem] border border-slate-200 dark:border-slate-800 p-2 gap-2">
                           <div className="relative w-full sm:w-[140px] shrink-0 bg-white dark:bg-[#2A2A2A] rounded-[1rem] border border-slate-200 dark:border-slate-700 flex items-center px-3 py-3">
-                            <span className="w-5 h-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full flex items-center justify-center text-[10px] font-black mr-2">$</span>
+                            <select className="bg-transparent outline-none font-black text-slate-800 dark:text-white text-sm cursor-pointer mr-2" value={formData.currency} onChange={e => setFormData({ ...formData, currency: e.target.value })}>
+                              <option value="IDR">Rp</option>
+                              <option value="USD">$</option>
+                              <option value="SGD">S$</option>
+                              <option value="JPY">¥</option>
+                              <option value="EUR">€</option>
+                            </select>
                             <select className="bg-transparent outline-none w-full font-bold text-slate-800 dark:text-white text-sm cursor-pointer appearance-none truncate" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
                               {formData.type === 'pengeluaran' ? (
-                                <><option value="Makanan">Makanan</option><option value="Transportasi">Transport</option><option value="Tagihan">Tagihan</option><option value="Belanja">Belanja</option><option value="Hiburan">Hiburan</option><option value="Investasi">Investasi</option><option value="Lainnya">Lainnya</option></>
+                                <><option value="Makanan">Makanan</option><option value="Transportasi">Transport</option><option value="Tagihan">Tagihan</option><option value="Belanja">Belanja</option><option value="Hiburan">Hiburan</option><option value="Investasi">Investasi</option><option value="Beri Hutang">Beri Hutang</option><option value="Bayar Pinjaman">Bayar Pinjaman</option><option value="Lainnya">Lainnya</option></>
                               ) : (
-                                <><option value="Gaji Pokok">Gaji</option><option value="Bonus">Bonus</option><option value="Investasi">Jual Aset</option><option value="Lainnya">Lainnya</option></>
+                                <><option value="Gaji Pokok">Gaji</option><option value="Bonus">Bonus</option><option value="Investasi">Jual Aset</option><option value="Terima Pinjaman">Terima Pinjaman</option><option value="Dibayar Hutang">Dibayar Hutang</option><option value="Lainnya">Lainnya</option></>
                               )}
                             </select>
                             <ChevronDown size={16} className="text-slate-400 ml-1 pointer-events-none" />
@@ -1113,7 +1318,40 @@ export default function DompetPintarPro() {
                         </div>
                       </div>
 
-                      {formData.amount && <p className="text-[12px] font-bold text-slate-500 mt-2 mb-4">Rate: {formatIDR(Number(formData.amount))}</p>}
+                      {['Beri Hutang', 'Bayar Pinjaman', 'Terima Pinjaman', 'Dibayar Hutang'].includes(formData.category) && (
+                        <div>
+                          <label className="text-[12px] font-bold text-slate-500 mb-2 block">Nama Pihak / Orang (Opsional)</label>
+                          <input placeholder="Contoh: Budi, Kantor, dll" className="w-full bg-slate-50 dark:bg-[#1A1A1A] rounded-[1.25rem] border border-slate-200 dark:border-slate-800 px-4 py-3 outline-none font-bold text-slate-800 dark:text-white text-sm" value={formData.person_name || ''} onChange={e => setFormData({ ...formData, person_name: e.target.value })} />
+                        </div>
+                      )}
+
+                      {formData.amount && <p className="text-[12px] font-bold text-slate-500 mt-2 mb-2">Rate: {formatIDR(Number(formData.amount))}</p>}
+
+                      {formData.currency !== 'IDR' && (
+                        <div className="flex items-center gap-2 mb-4 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl">
+                          <AlertOctagon size={16} className="text-amber-500 shrink-0" />
+                          <div className="flex-1">
+                            <label className="text-[10px] font-bold text-amber-700 dark:text-amber-400 block mb-1">Nominal Asli ({formData.currency})</label>
+                            <input type="number" placeholder={`Contoh: 15.50`} className="w-full bg-transparent outline-none font-bold text-amber-900 dark:text-amber-100 text-sm placeholder:text-amber-300 dark:placeholder:text-amber-700" value={formData.original_amount || ''} onChange={e => setFormData({ ...formData, original_amount: e.target.value })} />
+                          </div>
+                          <p className="text-[10px] text-amber-600 dark:text-amber-500 text-right w-[40%] leading-tight">Nilai utama (atas) tetap dalam IDR sebagai kalkulasi.</p>
+                        </div>
+                      )}
+
+                      {/* Geo-tagging */}
+                      <div className="flex items-center justify-between bg-slate-50 dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-slate-800 p-3 mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${useLocation ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' : 'bg-slate-200 text-slate-500 dark:bg-slate-800'}`}><Camera size={14} /></div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-800 dark:text-white">Simpan Lokasi (GPS)</p>
+                            <p className="text-[9px] text-slate-500">Tandai tempat transaksi ini terjadi</p>
+                          </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={useLocation} onChange={() => setUseLocation(!useLocation)} />
+                          <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500"></div>
+                        </label>
+                      </div>
 
                       {/* Submit */}
                       <div className="flex gap-3 pt-2">
@@ -1203,18 +1441,32 @@ export default function DompetPintarPro() {
                                   <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">{new Date(t.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' })}</span>
                                   <span className="text-[10px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700 font-medium">{t.category}</span>
                                   <span className="text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-lg border border-blue-100 dark:border-blue-800 font-bold flex items-center gap-0.5"><Landmark size={8} /> {t.wallet || 'Tunai'}</span>
+                                  {t.latitude && t.longitude && (
+                                    <a href={`https://maps.google.com/?q=${t.latitude},${t.longitude}`} target="_blank" rel="noreferrer" className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-lg border border-amber-100 dark:border-amber-800 font-bold flex items-center gap-0.5 hover:bg-amber-100 transition-colors">
+                                      <MapPin size={8} /> Geo
+                                    </a>
+                                  )}
                                 </div>
                               </div>
-                              {/* Amount on mobile */}
-                              <p className={`sm:hidden text-sm font-black shrink-0 truncate ${isIncome ? 'text-emerald-500' : isInvest ? 'text-teal-500' : isDebt ? 'text-slate-500' : 'text-rose-500'}`}>
-                                {isIncome ? '+' : '-'}{displayMoney(Number(t.amount))}
-                              </p>
+                              <div className="flex flex-col items-end sm:hidden shrink-0">
+                                <p className={`text-sm font-black truncate ${isIncome ? 'text-emerald-500' : isInvest ? 'text-teal-500' : isDebt ? 'text-slate-500' : 'text-rose-500'}`}>
+                                  {isIncome ? '+' : '-'}{displayMoney(Number(t.amount))}
+                                </p>
+                                {t.original_amount && t.currency && t.currency !== 'IDR' && (
+                                  <p className="text-[9px] font-bold text-slate-400 mt-0.5">{t.original_amount} {t.currency}</p>
+                                )}
+                              </div>
                             </div>
 
                             <div className="flex items-center justify-between sm:justify-end gap-3">
-                              <p className={`hidden sm:block text-base font-black tracking-tight mr-1 whitespace-nowrap truncate max-w-[150px] lg:max-w-[200px] text-right ${isIncome ? 'text-emerald-500' : isInvest ? 'text-teal-500' : isDebt ? 'text-slate-500' : 'text-rose-500'}`}>
-                                {isIncome ? '+' : '-'}{displayMoney(Number(t.amount))}
-                              </p>
+                              <div className="hidden sm:flex flex-col items-end mr-1">
+                                <p className={`text-base font-black tracking-tight whitespace-nowrap truncate max-w-[150px] lg:max-w-[200px] text-right ${isIncome ? 'text-emerald-500' : isInvest ? 'text-teal-500' : isDebt ? 'text-slate-500' : 'text-rose-500'}`}>
+                                  {isIncome ? '+' : '-'}{displayMoney(Number(t.amount))}
+                                </p>
+                                {t.original_amount && t.currency && t.currency !== 'IDR' && (
+                                  <p className="text-[10px] font-bold text-slate-400 mt-0.5">{t.original_amount} {t.currency}</p>
+                                )}
+                              </div>
                               <div className="flex items-center gap-1.5">
                                 <button onClick={() => setSelectedReceipt(t)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 rounded-xl border border-blue-200 dark:border-blue-800 transition-colors" title="Lihat Struk"><Receipt size={14} /></button>
                                 <button onClick={() => handleDuplicate(t)} className="p-2 text-violet-600 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400 rounded-xl border border-violet-200 dark:border-violet-800 transition-colors" title="Duplikat"><Copy size={14} /></button>
@@ -1443,36 +1695,162 @@ export default function DompetPintarPro() {
 
           {/* ═══ WALLETS VIEW ═══ */}
           {activeView === 'wallets' && <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-              {/* Wallet Breakdown */}
+            {/* Top row: Saldo + Hutang + Radar */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+              {/* Saldo Rekening */}
               <div className="bg-white dark:bg-[#111] rounded-2xl border border-slate-200/50 dark:border-slate-800/50 p-5">
-                <h3 className="text-sm font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Landmark size={16} className="text-blue-500" /> Saldo per Rekening</h3>
-                <div className="space-y-3">
-                  {walletBreakdown.length === 0 ? <p className="text-sm text-slate-400 text-center py-4">Belum ada data rekening.</p> : walletBreakdown.map(w => (<div key={w.name} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800"><div className="flex items-center justify-between mb-1.5"><div className="flex items-center gap-2"><div className="w-7 h-7 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center"><Landmark size={12} className="text-blue-600 dark:text-blue-400" /></div><span className="text-xs font-bold text-slate-700 dark:text-slate-300">{w.name}</span></div><span className={`text-sm font-black truncate max-w-[50%] text-right ${w.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>{displayMoney(w.balance)}</span></div><div className="flex gap-3 text-[10px] text-slate-500 pl-9"><span className="text-emerald-600 truncate max-w-[40%] text-right">+{formatIDR(w.income)}</span><span className="text-rose-500 truncate max-w-[40%] text-right">-{formatIDR(w.expense)}</span></div></div>))}
+                <h3 className="text-xs font-black text-slate-800 dark:text-white mb-3 flex items-center gap-2 uppercase tracking-widest"><Landmark size={14} className="text-blue-500" /> Saldo Rekening</h3>
+                <div className="space-y-2">
+                  {walletBreakdown.length === 0 ? <p className="text-sm text-slate-400 text-center py-4">Belum ada transaksi.</p> : walletBreakdown.map(w => (
+                    <div key={w.name} className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900 rounded-xl">
+                      <div className="flex items-center gap-2"><div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center"><Landmark size={11} className="text-blue-600 dark:text-blue-400" /></div><span className="text-xs font-bold text-slate-700 dark:text-slate-300">{w.name}</span></div>
+                      <div className="text-right"><p className={`text-xs font-black ${w.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{displayMoney(w.balance)}</p><p className="text-[9px] text-slate-400">+{formatIDR(w.income)} / -{formatIDR(w.expense)}</p></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Hutang Piutang */}
+              <div className="bg-white dark:bg-[#111] rounded-2xl border border-slate-200/50 dark:border-slate-800/50 p-5">
+                <h3 className="text-xs font-black text-slate-800 dark:text-white mb-3 flex items-center gap-2 uppercase tracking-widest"><Briefcase size={14} className="text-amber-500" /> Hutang Piutang</h3>
+                <div className="space-y-2">
+                  {debtTracker.length === 0 ? <div className="flex flex-col items-center py-4"><CheckCircle2 size={24} className="text-emerald-400 mb-2" /><p className="text-xs text-slate-400 text-center">Tidak ada hutang aktif!</p></div> : debtTracker.map(d => (
+                    <div key={d.name} className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900 rounded-xl">
+                      <div className="flex items-center gap-2"><div className={`w-6 h-6 rounded-lg flex items-center justify-center ${d.net > 0 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-rose-100 dark:bg-rose-900/30'}`}><span className="text-[10px]">{d.net > 0 ? '↑' : '↓'}</span></div><span className="text-xs font-bold text-slate-700 dark:text-slate-300">{d.name}</span></div>
+                      <div className="text-right"><p className={`text-xs font-black ${d.net > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{formatIDR(Math.abs(d.net))}</p><p className="text-[9px] text-slate-400">{d.net > 0 ? 'Berhutang padamu' : 'Kamu berhutang'}</p></div>
+                    </div>
+                  ))}
                 </div>
               </div>
               {/* Radar Tagihan */}
-              <div className="bg-[#0F172A] dark:bg-[#0C0C0E] border border-slate-800/60 p-6 rounded-2xl text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500 rounded-full blur-[50px] opacity-20 pointer-events-none" />
-                <div className="flex items-center gap-2.5 text-rose-400 mb-4 relative z-10"><div className="w-8 h-8 bg-rose-500/20 rounded-xl flex items-center justify-center border border-rose-500/30"><CreditCard size={16} /></div><div><h3 className="font-bold text-sm uppercase tracking-widest">Radar Tagihan</h3><p className="text-[10px] text-slate-500">Deteksi biaya berulang</p></div></div>
-                <div className="mb-4 relative z-10"><p className="text-[10px] text-slate-400 mb-0.5">Total Tagihan</p><p className="text-3xl font-black truncate">{displayMoney(stats.totalBills)}</p></div>
-                <div className="space-y-2 relative z-10">
-                  {stats.billsTransactions.length === 0 ? (<div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/10 p-3 rounded-xl border border-emerald-400/20"><CheckCircle2 size={16} /><p className="text-xs font-medium">Tidak ada tagihan terdeteksi!</p></div>) : (stats.billsTransactions.slice(0, 5).map((t: any) => (<div key={t.id} className="flex justify-between items-center text-xs bg-slate-800 p-2.5 rounded-xl border border-slate-700"><span className="font-medium text-slate-300 truncate max-w-[150px]">{t.title}</span><span className="font-bold text-rose-400 shrink-0 ml-2 truncate max-w-[50%] text-right">{formatIDR(Number(t.amount))}</span></div>)))}
+              <div className="bg-[#0F172A] border border-slate-800/60 p-5 rounded-2xl text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500 rounded-full blur-[40px] opacity-20 pointer-events-none" />
+                <div className="flex items-center gap-2 text-rose-400 mb-3 relative z-10"><div className="w-7 h-7 bg-rose-500/20 rounded-xl flex items-center justify-center border border-rose-500/30"><CreditCard size={14} /></div><div><p className="font-black text-xs uppercase tracking-widest">Radar Tagihan</p><p className="text-[9px] text-slate-500">Biaya berulang</p></div></div>
+                <p className="text-2xl font-black mb-3 relative z-10">{displayMoney(stats.totalBills)}</p>
+                <div className="space-y-1.5 relative z-10">
+                  {stats.billsTransactions.length === 0 ? <div className="flex items-center gap-2 text-emerald-400 bg-emerald-400/10 p-2.5 rounded-xl border border-emerald-400/20"><CheckCircle2 size={14} /><p className="text-xs">Bersih, tidak ada tagihan!</p></div> : stats.billsTransactions.slice(0, 4).map((t: any) => (
+                    <div key={t.id} className="flex justify-between items-center text-xs bg-slate-800/80 p-2 rounded-xl border border-slate-700">
+                      <div className="min-w-0 flex-1 pr-2"><p className="text-slate-300 truncate text-[11px]">{t.title}</p><p className="font-bold text-rose-400 text-[10px]">{formatIDR(Number(t.amount))}</p></div>
+                      <button onClick={() => handleQuickPay(t)} className="shrink-0 bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-2 rounded-lg transition-colors text-[10px]">Bayar</button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
+
+            {/* Kantong Tabungan */}
+            <div className="bg-white dark:bg-[#111] rounded-2xl border border-slate-200/50 dark:border-slate-800/50 p-5 mb-5">
+              <div className="flex justify-between items-center mb-4">
+                <div><h3 className="text-sm font-black flex items-center gap-2 text-slate-800 dark:text-white"><Target size={16} className="text-indigo-500" /> Kantong Tabungan</h3><p className="text-[10px] text-slate-400 mt-0.5">Sub-rekening virtual untuk target spesifik</p></div>
+                <button onClick={() => setShowPocketModal(true)} className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 px-3 py-1.5 rounded-xl transition-colors shadow-sm"><Plus size={13} /> Buat Kantong</button>
+              </div>
+              {pockets.length === 0 ? (
+                <div className="flex flex-col items-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                  <PiggyBank size={32} className="text-slate-300 dark:text-slate-700 mb-2" />
+                  <p className="text-sm font-bold text-slate-400">Belum ada kantong tabungan</p>
+                  <p className="text-xs text-slate-400 mt-1">Buat kantong untuk target impianmu!</p>
+                  <button onClick={() => setShowPocketModal(true)} className="mt-3 text-xs font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors">+ Buat Kantong Pertama</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {pockets.map(p => {
+                    const pct = Math.min(100, Math.round((p.balance / p.target_amount) * 100));
+                    return (
+                      <div key={p.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-gradient-to-br from-indigo-50 to-slate-50 dark:from-indigo-900/10 dark:to-slate-900">
+                        <div className="flex items-center gap-2 mb-3"><span className="text-2xl">{p.icon}</span><div><p className="font-black text-sm text-slate-800 dark:text-white leading-tight">{p.name}</p><p className="text-[10px] text-slate-400">{pct}% tercapai</p></div></div>
+                        <div className="mb-2"><div className="flex justify-between text-[10px] mb-1"><span className="text-slate-500">{formatIDR(p.balance)}</span><span className="font-bold text-indigo-600">{formatIDR(p.target_amount)}</span></div><div className="h-2 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} /></div></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Portofolio Investasi */}
+            <div className="bg-white dark:bg-[#111] rounded-2xl border border-slate-200/50 dark:border-slate-800/50 p-5 mb-5">
+              <div className="flex justify-between items-center mb-4">
+                <div><h3 className="text-sm font-black flex items-center gap-2 text-slate-800 dark:text-white"><TrendingUp size={16} className="text-teal-500" /> Portofolio Investasi</h3><p className="text-[10px] text-slate-400 mt-0.5">Pantau nilai & keuntungan aset kamu</p></div>
+                <button onClick={() => setShowInvestModal(true)} className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-teal-500 hover:bg-teal-600 px-3 py-1.5 rounded-xl transition-colors shadow-sm"><Plus size={13} /> Tambah Aset</button>
+              </div>
+              {investments.length === 0 ? (
+                <div className="flex flex-col items-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                  <Gem size={32} className="text-slate-300 dark:text-slate-700 mb-2" />
+                  <p className="text-sm font-bold text-slate-400">Belum ada aset investasi</p>
+                  <p className="text-xs text-slate-400 mt-1">Catat emas, saham, reksa dana, kripto, dll.</p>
+                  <button onClick={() => setShowInvestModal(true)} className="mt-3 text-xs font-bold text-teal-600 bg-teal-50 dark:bg-teal-900/20 px-4 py-2 rounded-xl border border-teal-200 dark:border-teal-800 hover:bg-teal-100 transition-colors">+ Tambah Aset Pertama</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {investments.map(inv => {
+                    const profit = inv.current_value - inv.invested_amount;
+                    const pct = (profit / inv.invested_amount) * 100;
+                    const isUp = profit >= 0;
+                    return (
+                      <div key={inv.id} className={`p-4 rounded-xl border bg-gradient-to-br ${isUp ? 'from-teal-50 to-slate-50 border-teal-100 dark:from-teal-900/10 dark:to-slate-900 dark:border-teal-900' : 'from-rose-50 to-slate-50 border-rose-100 dark:from-rose-900/10 dark:to-slate-900 dark:border-rose-900'}`}>
+                        <div className="flex justify-between items-start mb-2"><div><p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{inv.asset_type}</p><p className="font-black text-sm text-slate-800 dark:text-white mt-0.5">{inv.asset_name}</p>{inv.platform && <p className="text-[10px] text-slate-400">{inv.platform}</p>}</div><span className={`text-[10px] font-black px-2 py-1 rounded-lg ${isUp ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>{isUp ? '+' : ''}{pct.toFixed(1)}%</span></div>
+                        <div className="flex justify-between items-end mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800"><div><p className="text-[9px] text-slate-400">Nilai Kini</p><p className={`font-black text-sm ${isUp ? 'text-teal-600' : 'text-rose-600'}`}>{formatIDR(inv.current_value)}</p></div><div className="text-right"><p className="text-[9px] text-slate-400">Modal</p><p className="text-xs font-bold text-slate-600 dark:text-slate-300">{formatIDR(inv.invested_amount)}</p></div></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* Export */}
             <div className="bg-white dark:bg-[#111] rounded-2xl border border-slate-200/50 dark:border-slate-800/50 p-5 mb-10">
-              <h3 className="text-sm font-black mb-3">Export Laporan</h3>
-              <div className="flex gap-3">
-                <button onClick={exportPDF} className="flex-1 flex items-center justify-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-bold py-3 rounded-xl border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors text-sm"><FileText size={16} /> Export PDF</button>
-                <button onClick={exportCSV} className="flex-1 flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold py-3 rounded-xl border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors text-sm"><Download size={16} /> Export CSV</button>
+              <h3 className="text-sm font-black mb-1 text-slate-800 dark:text-white">Export Laporan</h3>
+              <p className="text-[10px] text-slate-400 mb-3">Unduh atau bagikan ringkasan keuanganmu</p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button onClick={exportPDF} className="flex-1 flex items-center justify-center gap-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-bold py-3 rounded-xl border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition-colors text-sm"><FileText size={16} /> PDF</button>
+                <button onClick={exportCSV} className="flex-1 flex items-center justify-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold py-3 rounded-xl border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors text-sm"><Download size={16} /> CSV</button>
+                <button onClick={exportWA} className="flex-1 flex items-center justify-center gap-2 bg-teal-50 dark:bg-teal-900/20 text-teal-700 dark:text-teal-400 font-bold py-3 rounded-xl border border-teal-200 dark:border-teal-800 hover:bg-teal-100 transition-colors text-sm"><MessageSquare size={16} /> WhatsApp</button>
               </div>
             </div>
           </>}
 
+
+
         </div>{/* end content padding */}
       </div>{/* end main content */}
+
+      {/* ── POCKET MODAL ── */}
+      {showPocketModal && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4" onClick={() => setShowPocketModal(false)}>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-6 text-white">
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center"><Target size={20} /></div><div><h3 className="font-black text-lg">Buat Kantong Baru</h3><p className="text-indigo-200 text-xs">Tentukan nama dan target tabunganmu</p></div></div><button onClick={() => setShowPocketModal(false)} className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors"><X size={16} /></button></div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Nama Kantong</label><input placeholder="Contoh: Liburan Jepang ✈️" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all" value={pocketForm.name} onChange={e => setPocketForm({...pocketForm, name: e.target.value})} /></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Ikon</label><div className="flex gap-2 flex-wrap">{['🎯','✈️','🏠','💻','🎓','💍','🚗','💎','🏖️','🎮'].map(ic => (<button key={ic} onClick={() => setPocketForm({...pocketForm, icon: ic})} className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all ${pocketForm.icon === ic ? 'bg-indigo-100 dark:bg-indigo-900/40 ring-2 ring-indigo-500' : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200'}`}>{ic}</button>))}</div></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Target Nominal (Rp)</label><input type="number" placeholder="25.000.000" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all" value={pocketForm.target_amount} onChange={e => setPocketForm({...pocketForm, target_amount: e.target.value})} /></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Saldo Awal (Opsional)</label><input type="number" placeholder="0" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all" value={pocketForm.balance} onChange={e => setPocketForm({...pocketForm, balance: e.target.value})} /></div>
+              <button onClick={handleSavePocket} disabled={isSavingPocket} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3.5 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-indigo-500/20">{isSavingPocket ? <><Loader2 className="animate-spin" size={18} />Menyimpan...</> : <><Check size={18} /> Buat Kantong</>}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── INVEST MODAL ── */}
+      {showInvestModal && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-4" onClick={() => setShowInvestModal(false)}>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-teal-500 to-emerald-600 p-6 text-white">
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center"><TrendingUp size={20} /></div><div><h3 className="font-black text-lg">Tambah Aset Investasi</h3><p className="text-teal-200 text-xs">Catat nilai aset yang kamu miliki</p></div></div><button onClick={() => setShowInvestModal(false)} className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-white/20 transition-colors"><X size={16} /></button></div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Jenis Aset</label><div className="flex flex-wrap gap-2">{['Saham','Reksa Dana','Emas','Kripto','Deposito','Properti','Lainnya'].map(t => (<button key={t} onClick={() => setInvestForm({...investForm, asset_type: t})} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${investForm.asset_type === t ? 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-400 ring-2 ring-teal-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'}`}>{t}</button>))}</div></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Nama Aset</label><input placeholder="Contoh: BBCA, Bitcoin, SBN" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 transition-all" value={investForm.name} onChange={e => setInvestForm({...investForm, name: e.target.value})} /></div>
+              <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Platform</label><input placeholder="Contoh: Bibit, Indodax, Tokopedia" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 transition-all" value={investForm.platform} onChange={e => setInvestForm({...investForm, platform: e.target.value})} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Modal Awal (Rp)</label><input type="number" placeholder="0" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 transition-all" value={investForm.invested_amount} onChange={e => setInvestForm({...investForm, invested_amount: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">Nilai Kini (Rp)</label><input type="number" placeholder="0" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 transition-all" value={investForm.current_value} onChange={e => setInvestForm({...investForm, current_value: e.target.value})} /></div>
+              </div>
+              {investForm.invested_amount && investForm.current_value && (() => { const p = Number(investForm.current_value) - Number(investForm.invested_amount); const pct = (p / Number(investForm.invested_amount)) * 100; return <div className={`flex items-center justify-between p-3 rounded-xl ${p >= 0 ? 'bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800' : 'bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800'}`}><span className="text-xs font-bold text-slate-600 dark:text-slate-400">Estimasi P&L</span><span className={`text-sm font-black ${p >= 0 ? 'text-teal-600' : 'text-rose-600'}`}>{p >= 0 ? '+' : ''}{formatIDR(p)} ({pct.toFixed(1)}%)</span></div>; })()}
+              <button onClick={handleSaveInvest} disabled={isSavingInvest} className="w-full bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold py-3.5 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-teal-500/20">{isSavingInvest ? <><Loader2 className="animate-spin" size={18} />Menyimpan...</> : <><Check size={18} /> Simpan Aset</>}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ MOBILE BOTTOM NAV REFINED ═══ */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-xl border-t border-slate-200/60 dark:border-slate-800/60 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
@@ -1557,6 +1935,11 @@ export default function DompetPintarPro() {
                     </button>
                   </div>
                 </div>
+                {selectedReceipt.image_url && (
+                  <div className="mt-4 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm">
+                    <img src={selectedReceipt.image_url} alt="Bukti Struk" className="w-full h-auto object-cover max-h-48" />
+                  </div>
+                )}
               </div>
               {/* Barcode decoration */}
               <div className="mx-5 border-t-2 border-dashed border-slate-200 dark:border-slate-700 pt-5 pb-5 text-center">
@@ -1617,6 +2000,24 @@ export default function DompetPintarPro() {
                     </div>
                     {catBudgets[cat] && <p className="text-[10px] text-blue-500 text-right mt-1 font-bold truncate">{formatIDR(Number(catBudgets[cat]))}</p>}
                   </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Theme Picker */}
+            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+              <h4 className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2 mb-3 text-sm"><Sparkles size={16} className="text-amber-500" /> Tema Aplikasi (Beta)</h4>
+              <div className="flex gap-3">
+                {[
+                  { id: 'default', name: 'Default', bg: 'bg-blue-500' },
+                  { id: 'cyberpunk', name: 'Cyberpunk', bg: 'bg-fuchsia-500' },
+                  { id: 'matcha', name: 'Matcha', bg: 'bg-emerald-500' },
+                  { id: 'ocean', name: 'Ocean', bg: 'bg-cyan-500' }
+                ].map(theme => (
+                  <button key={theme.id} onClick={() => setAppTheme(theme.id)} className={`flex-1 p-2 rounded-xl border ${appTheme === theme.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'} transition-all flex flex-col items-center gap-1.5`}>
+                    <div className={`w-6 h-6 rounded-full ${theme.bg}`} />
+                    <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{theme.name}</span>
+                  </button>
                 ))}
               </div>
             </div>
