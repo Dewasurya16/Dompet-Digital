@@ -165,12 +165,17 @@ export default function DompetPintarPro() {
   const [activeTab, setActiveTab] = useState<'insights' | 'wallets'>('insights');
   const [activeView, setActiveView] = useState<'dashboard' | 'transactions' | 'analytics' | 'wallets' | 'settings'>('dashboard');
 
-  const fetchData = async () => {
+  const fetchData = async (userId?: string) => {
+    // Gunakan userId dari parameter atau dari session saat ini
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    const uid = userId || currentSession?.user?.id;
+    if (!uid) return; // Jangan fetch jika tidak ada user yang login
+
     setLoading(true);
     const [txRes, pocketsRes, invRes] = await Promise.all([
-      supabase.from('transactions').select('*').order('created_at', { ascending: false }),
-      supabase.from('pockets').select('*').order('created_at', { ascending: false }),
-      supabase.from('investments').select('*').order('created_at', { ascending: false })
+      supabase.from('transactions').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('pockets').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('investments').select('*').eq('user_id', uid).order('created_at', { ascending: false })
     ]);
     if (!txRes.error && txRes.data) setTransactions(txRes.data);
     if (!pocketsRes.error && pocketsRes.data) setPockets(pocketsRes.data);
@@ -306,7 +311,10 @@ export default function DompetPintarPro() {
     const ok = await confirm('Hapus Semua Data', 'Tindakan ini akan menghapus SELURUH riwayat transaksimu dan tidak bisa dibatalkan.', true);
     if (!ok) return;
     setIsSubmitting(true);
-    const { error } = await supabase.from('transactions').delete().not('id', 'is', null);
+    const uid = session?.user?.id;
+    if (!uid) return;
+    // Hapus hanya data milik user yang sedang login
+    const { error } = await supabase.from('transactions').delete().eq('user_id', uid);
     if (!error) { localStorage.clear(); window.location.reload(); }
     else { showToast('Gagal mereset data.', 'error'); setIsSubmitting(false); }
   };
@@ -393,7 +401,7 @@ export default function DompetPintarPro() {
       } catch (err) { console.warn("Location disabled or timed out"); }
     }
 
-    const payload = { title: formData.title, amount: Number(formData.amount), type: formData.type, category: formData.category, wallet: formData.wallet, image_url: formData.image_url, person_name: formData.person_name, currency: formData.currency, original_amount: formData.original_amount ? Number(formData.original_amount) : null, latitude: lat, longitude: lng };
+    const payload = { title: formData.title, amount: Number(formData.amount), type: formData.type, category: formData.category, wallet: formData.wallet, image_url: formData.image_url, person_name: formData.person_name, currency: formData.currency, original_amount: formData.original_amount ? Number(formData.original_amount) : null, latitude: lat, longitude: lng, user_id: session?.user?.id };
 
     const oldNetWorth = stats.globalNetWorth;
 
