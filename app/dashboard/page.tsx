@@ -372,6 +372,7 @@ export default function DashboardPage() {
     e.preventDefault(); if (!formData.title || !formData.amount) return;
     setIsSubmitting(true);
     let lat = formData.latitude, lng = formData.longitude;
+    
     if (useLocation && !lat && !lng) {
       try {
         const pos = await new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 }));
@@ -380,7 +381,6 @@ export default function DashboardPage() {
     }
 
     const payload = { title: formData.title, amount: Number(formData.amount), type: formData.type, category: formData.category, wallet: formData.wallet, image_url: formData.image_url, person_name: formData.person_name, currency: formData.currency, original_amount: formData.original_amount ? Number(formData.original_amount) : null, latitude: lat, longitude: lng, user_id: session?.user?.id };
-    const oldNetWorth = stats.globalNetWorth;
 
     if (editingId) {
       const { error } = await supabase.from('transactions').update(payload).eq('id', editingId);
@@ -389,11 +389,55 @@ export default function DashboardPage() {
         setEditingId(null); setReceiptPreview(null); setFormData(DEFAULT_FORM); setUseLocation(false); fetchData(); showToast('Transaksi berhasil diperbarui!', 'success');
       } else showToast(`Gagal update: ${error.message}`, 'error');
     } else {
+      // 🚀 PROSES SIMPAN TRANSAKSI BARU
       const { data, error } = await supabase.from('transactions').insert([payload]).select().single();
       setIsSubmitting(false);
+      
       if (!error && data) {
-        setFormData(DEFAULT_FORM); setUseLocation(false); setReceiptPreview(null); fetchData(); showToast('Transaksi berhasil disimpan! 🎉', 'success');
-      } else showToast(`Gagal simpan: ${error?.message}`, 'error');
+        // ✉️ TRIGGER 1: KIRIM EMAIL STRUK
+        if (session?.user?.email) {
+          fetch('/api/send-receipt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: session.user.email,
+              title: payload.title,
+              amount: payload.amount,
+              type: payload.type,
+              category: payload.category,
+              wallet: payload.wallet,
+              refId: data.id,
+              date: new Date().toLocaleString('id-ID'),
+              latitude: lat,
+              longitude: lng
+            })
+          }).catch(console.error);
+
+          // 🤖 TRIGGER 2: CEK BUDGET UNTUK NOTIFIKASI AI
+          if (payload.type === 'pengeluaran' && catBudgets[payload.category]) {
+            const limit = Number(catBudgets[payload.category]);
+            // Hitung total pengeluaran + transaksi baru
+            const spentSoFar = filteredTransactions.filter((t: any) => t.type === 'pengeluaran' && t.category === payload.category).reduce((acc: any, curr: any) => acc + Number(curr.amount), 0) + payload.amount;
+            
+            // Jika lewat 90% dari budget, kirim email alert
+            if (spentSoFar >= limit * 0.9 && limit > 0) {
+              fetch('/api/send-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: session.user.email,
+                  type: 'budget_alert',
+                  data: { category: payload.category, spent: spentSoFar, limit: limit, personality: aiPersonality }
+                })
+              }).catch(console.error);
+            }
+          }
+        }
+
+        setFormData(DEFAULT_FORM); setUseLocation(false); setReceiptPreview(null); fetchData(); showToast('Transaksi disimpan & Email dikirim! 🎉', 'success');
+      } else {
+        showToast(`Gagal simpan: ${error?.message}`, 'error');
+      }
     }
   };
 
