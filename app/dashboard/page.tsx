@@ -732,16 +732,14 @@ export default function DashboardPage() {
     const doc = new jsPDF();
     const periodText = filterMode === 'month' ? (filterMonth === 'all' ? 'Semua Waktu' : parseMonthSafe(filterMonth).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })) : `${customStartDate} s/d ${customEndDate}`;
 
-    // ── HEADER KOMIK ──────────────────────────────
-    // Background header kuning (tema kartun)
-    doc.setFillColor(253, 230, 138); // #FDE68A
-    doc.rect(0, 0, 210, 50, 'F');
-    // Border bawah header
-    doc.setDrawColor(11, 62, 58);
-    doc.setLineWidth(2);
-    doc.line(0, 50, 210, 50);
+    // ── HEADER NEO-BRUTALISM ──────────────────────
+    doc.setFillColor(253, 230, 138); // Yellow
+    doc.rect(0, 0, 210, 45, 'F');
+    doc.setDrawColor(11, 62, 58); // Dark Teal
+    doc.setLineWidth(1.5);
+    doc.line(0, 45, 210, 45);
 
-    // ── LOGO DI HEADER ────────────────────────────
+    // ── LOGO ────────────────────────────
     try {
       const resp = await fetch('/logo.png');
       const blob = await resp.blob();
@@ -751,131 +749,138 @@ export default function DashboardPage() {
         reader.readAsDataURL(blob);
       });
       
-      // Kompres logo dengan Canvas agar PDF tidak bengkak (mencegah Payload Too Large saat kirim email)
+      // Canvas resolusi TINGGI (600x600) agar tidak blur, tapi tetap JPEG agar ringan!
       const compressedB64 = await new Promise<string>((resolve) => {
         const img = new window.Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          canvas.width = 150; // Ukuran kecil yang cukup tajam untuk PDF (30x30 mm)
-          canvas.height = 150;
+          canvas.width = 600; 
+          canvas.height = 600;
           const ctx = canvas.getContext('2d');
           if (ctx) {
-            ctx.drawImage(img, 0, 0, 150, 150);
-            resolve(canvas.toDataURL('image/jpeg', 0.8)); // Gunakan JPEG terkompresi
-          } else {
-            resolve(rawB64);
-          }
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, 600, 600);
+            ctx.drawImage(img, 0, 0, 600, 600);
+            resolve(canvas.toDataURL('image/jpeg', 0.85));
+          } else resolve(rawB64);
         };
         img.onerror = () => resolve(rawB64);
         img.src = rawB64;
       });
 
+      // Kotak Logo Neo-Brutalist
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(165, 8, 34, 34, 4, 4, 'F');
-      doc.setDrawColor(11, 62, 58);
-      doc.setLineWidth(1.5);
-      doc.roundedRect(165, 8, 34, 34, 4, 4, 'S');
+      doc.roundedRect(165, 6, 32, 32, 4, 4, 'F');
+      
       // Shadow Logo
       doc.setDrawColor(11, 62, 58);
       doc.setLineWidth(0.5);
-      doc.roundedRect(167, 10, 34, 34, 4, 4, 'S');
-      doc.addImage(compressedB64, 'JPEG', 167, 10, 30, 30, undefined, 'FAST');
+      doc.roundedRect(167, 8, 32, 32, 4, 4, 'S');
+      
+      // Border utama Logo
+      doc.setLineWidth(1.5);
+      doc.roundedRect(165, 6, 32, 32, 4, 4, 'S');
+      
+      doc.addImage(compressedB64, 'JPEG', 166, 7, 30, 30, undefined, 'FAST');
     } catch { /* skip */ }
 
-    // Judul
+    // ── HEADER TEXT ──────────────────────────────
     doc.setTextColor(11, 62, 58);
     doc.setFontSize(26);
     doc.setFont('helvetica', 'bold');
-    doc.text('LAPORAN KEUANGAN', 14, 24);
-    doc.setFontSize(11);
+    doc.text('LAPORAN KEUANGAN', 14, 22);
+    
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Dicetak pada : ${new Date().toLocaleDateString('id-ID')} • Oleh: Dompet Digital`, 14, 34);
-    doc.text(`Periode      : ${periodText}`, 14, 42);
+    doc.text(`Dompet Digital by Dewasurya16`, 14, 30);
+    doc.text(`Periode Cetak : ${new Date().toLocaleDateString('id-ID')}`, 14, 36);
+    doc.text(`Rentang Waktu : ${periodText}`, 14, 42);
 
-    // ── BOX KEKAYAAN BERSIH ───────────────────────
-    const summaryY = 60;
-    doc.setFillColor(167, 243, 208); // Hijau terang
-    doc.roundedRect(14, summaryY, 182, 36, 4, 4, 'F');
-    doc.setDrawColor(11, 62, 58);
-    doc.setLineWidth(1.5);
-    doc.roundedRect(14, summaryY, 182, 36, 4, 4, 'S');
+    // ── KOTAK RINGKASAN NEO-BRUTALIST ───────────────────────
+    const summaryY = 56;
+    doc.setFillColor(167, 243, 208); // Hijau Emerald Terang
+    doc.roundedRect(14, summaryY, 182, 38, 4, 4, 'F');
+    
     // Shadow box
     doc.setDrawColor(11, 62, 58);
     doc.setLineWidth(0.5);
-    doc.roundedRect(16, summaryY + 2, 182, 36, 4, 4, 'S');
+    doc.roundedRect(16, summaryY + 2, 182, 38, 4, 4, 'S');
+    // Main Border
+    doc.setLineWidth(1.5);
+    doc.roundedRect(14, summaryY, 182, 38, 4, 4, 'S');
 
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(11, 62, 58);
-    doc.text('TOTAL KEKAYAAN BERSIH', 20, summaryY + 12);
+    doc.text('TOTAL KEKAYAAN BERSIH', 22, summaryY + 12);
     
-    doc.setFontSize(22);
+    doc.setFontSize(24);
     doc.setTextColor(stats.netWorth >= 0 ? 11 : 244, stats.netWorth >= 0 ? 62 : 63, stats.netWorth >= 0 ? 58 : 94);
-    doc.text(formatIDR(stats.netWorth), 20, summaryY + 26);
+    doc.text(formatIDR(stats.netWorth), 22, summaryY + 26);
 
-    // Info Samping
+    // Garis Vertikal Pemisah di dalam Box
+    doc.setLineWidth(0.5);
+    doc.line(105, summaryY + 6, 105, summaryY + 32);
+
+    // Info Samping Kanan
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(11, 62, 58);
-    doc.text('Pemasukan', 110, summaryY + 14);
-    doc.text('Pengeluaran', 110, summaryY + 22);
-    doc.text('Aset / Investasi', 110, summaryY + 30);
+    doc.text('Pemasukan', 115, summaryY + 12);
+    doc.text('Pengeluaran', 115, summaryY + 20);
+    doc.text('Aset / Investasi', 115, summaryY + 28);
     
-    // Titik dua
-    doc.text(':', 138, summaryY + 14);
-    doc.text(':', 138, summaryY + 22);
-    doc.text(':', 138, summaryY + 30);
+    doc.text(':', 142, summaryY + 12);
+    doc.text(':', 142, summaryY + 20);
+    doc.text(':', 142, summaryY + 28);
     
-    // Angka rata kanan
     doc.setFont('helvetica', 'bold');
-    doc.text(formatIDR(stats.income), 185, summaryY + 14, { align: 'right' });
-    doc.text(formatIDR(stats.expense), 185, summaryY + 22, { align: 'right' });
-    doc.text(formatIDR(stats.totalAssets), 185, summaryY + 30, { align: 'right' });
+    doc.text(formatIDR(stats.income), 185, summaryY + 12, { align: 'right' });
+    doc.text(formatIDR(stats.expense), 185, summaryY + 20, { align: 'right' });
+    doc.text(formatIDR(stats.totalAssets), 185, summaryY + 28, { align: 'right' });
 
-    // ── TABEL TRANSAKSI ───────────────────────────
+    // ── TABEL TRANSAKSI NEO-BRUTALIST (RAPI) ───────────────────────────
     autoTable(doc, {
-      startY: summaryY + 46,
+      startY: summaryY + 48,
       head: [['Tanggal', 'Keterangan', 'Kategori', 'Sumber', 'Tipe', 'Jumlah (Rp)']],
       body: filteredTransactions.map(t => [
         new Date(t.created_at).toLocaleDateString('id-ID'),
-        t.title.length > 25 ? t.title.substring(0, 25) + '...' : t.title, 
+        t.title.length > 30 ? t.title.substring(0, 30) + '...' : t.title, 
         t.category,
         t.wallet || 'Tunai', 
-        t.type === 'pemasukan' ? 'Masuk' : 'Keluar',
+        t.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran',
         new Intl.NumberFormat('id-ID').format(Number(t.amount))
       ]),
       theme: 'grid',
       styles: { 
         cellPadding: 5, 
-        fontSize: 10, 
+        fontSize: 9, 
         textColor: [11, 62, 58], 
-        lineColor: [11, 62, 58], 
+        lineColor: [11, 62, 58],
         lineWidth: 0.5,
         font: 'helvetica'
       },
       headStyles: { 
-        fillColor: [253, 230, 138], // Kuning kartun
+        fillColor: [253, 230, 138], // Kuning Neo
         textColor: [11, 62, 58], 
         fontStyle: 'bold', 
-        fontSize: 11, 
+        fontSize: 10, 
         halign: 'center',
         lineWidth: 1
       },
+      alternateRowStyles: { fillColor: [253, 251, 247] },
       columnStyles: { 
-        0: { cellWidth: 25 },
+        0: { cellWidth: 22 },
         1: { cellWidth: 'auto' },
         2: { cellWidth: 28 },
         3: { cellWidth: 25 },
-        4: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
-        5: { cellWidth: 35, halign: 'right', fontStyle: 'bold' } 
+        4: { cellWidth: 25, halign: 'center', fontStyle: 'bold' },
+        5: { cellWidth: 32, halign: 'right', fontStyle: 'bold' } 
       },
-      alternateRowStyles: { fillColor: [253, 251, 247] },
       didParseCell: (data: any) => {
-        // Beri warna hijau/merah pada teks Tipe & Jumlah
-        if (data.section === 'body') {
+        if (data.section === 'body' && (data.column.index === 4 || data.column.index === 5)) {
           const typeVal = data.row.raw[4];
-          if (data.column.index === 4 || data.column.index === 5) {
-            data.cell.styles.textColor = typeVal === 'Masuk' ? [16, 185, 129] : [244, 63, 94];
-          }
+          data.cell.styles.textColor = typeVal === 'Pemasukan' ? [16, 185, 129] : [244, 63, 94];
         }
       }
     });
@@ -887,8 +892,8 @@ export default function DashboardPage() {
       doc.setFontSize(8);
       doc.setTextColor(11, 62, 58);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Dompet Digital  •  Halaman ${i} dari ${pageCount}`, 14, 290);
-      doc.text('mydompetdigital.my.id', 150, 290);
+      doc.text(`Dompet Digital • Halaman ${i} dari ${pageCount}`, 14, 290);
+      doc.text('mydompetdigital.my.id', 196, 290, { align: 'right' });
     }
     return doc;
   };

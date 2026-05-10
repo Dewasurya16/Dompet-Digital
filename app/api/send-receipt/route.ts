@@ -49,8 +49,8 @@ export async function POST(req: Request) {
                 
                 <!-- LOGO HEADER -->
                 <div style="text-align: center; margin-bottom: 20px;">
-                  <div style="display:inline-block; background:#FFFFFF; border: 3px solid ${darkTeal}; border-radius: 16px; box-shadow: 4px 4px 0 0 ${darkTeal}; padding: 10px 14px; margin-bottom:6px;">
-                    <span style="font-size: 36px; line-height: 1;">💳</span>
+                  <div style="display:inline-block; background:#FFFFFF; border: 3px solid ${darkTeal}; border-radius: 16px; box-shadow: 4px 4px 0 0 ${darkTeal}; padding: 8px; margin-bottom:6px;">
+                    <img src="https://www.mydompetdigital.my.id/logo.png" alt="Dompet Digital" style="width:56px;height:56px;object-fit:contain;display:block;" />
                   </div>
                   <div style="font-size: 22px; font-weight: 900; color: ${darkTeal}; letter-spacing: -0.5px;">Dompet<span style="color: #10B981;">.</span></div>
                 </div>
