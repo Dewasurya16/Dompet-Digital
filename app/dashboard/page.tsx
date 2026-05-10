@@ -368,7 +368,7 @@ export default function DashboardPage() {
     return { title: 'Pemula', icon: '🌱' };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!formData.title || !formData.amount) return;
     setIsSubmitting(true);
     let lat = formData.latitude, lng = formData.longitude;
@@ -394,8 +394,8 @@ export default function DashboardPage() {
       setIsSubmitting(false);
       
       if (!error && data) {
-        // ✉️ TRIGGER 1: KIRIM EMAIL STRUK
         if (session?.user?.email) {
+          // ✉️ TRIGGER 1: KIRIM EMAIL STRUK
           fetch('/api/send-receipt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -431,6 +431,45 @@ export default function DashboardPage() {
                 })
               }).catch(console.error);
             }
+          }
+
+          // 🚨 TRIGGER 3: CEK SALDO KAS/DOMPET MINUS (KAS MERAH)
+          const currentWalletBalance = walletBreakdown.find((w: any) => w.name === payload.wallet)?.balance || 0;
+          const newWalletBalance = payload.type === 'pengeluaran' ? currentWalletBalance - payload.amount : currentWalletBalance + payload.amount;
+
+          if (newWalletBalance < 0 && payload.type === 'pengeluaran') {
+            fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: session.user.email,
+                type: 'anomaly_alert', 
+                data: { 
+                  amount: payload.amount, 
+                  category: 'SALDO MINUS', 
+                  description: `Awas! Pengeluaran ini membuat saldo ${payload.wallet} kamu jadi minus/berdarah (Defisit). Segera cek keuanganmu!` 
+                }
+              })
+            }).catch(console.error);
+          }
+
+          // 🏆 TRIGGER 4: TARGET IMPIAN UTAMA TERCAPAI
+          const currentNetWorth = stats.globalNetWorth;
+          const target = Number(targetSaving);
+          
+          if (currentNetWorth < target && (currentNetWorth + payload.amount) >= target && payload.type === 'pemasukan') {
+            fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: session.user.email,
+                type: 'goal_reached',
+                data: { 
+                  pocketName: 'Target Kekayaan Impian', 
+                  targetAmount: target 
+                }
+              })
+            }).catch(console.error);
           }
         }
 
@@ -472,18 +511,47 @@ export default function DashboardPage() {
     if (!error) { fetchData(); showToast(`Tagihan ${t.title} berhasil dicatat!`, 'success'); } else { showToast('Gagal mencatat: ' + error.message, 'error'); }
   };
 
-  const handleSavePocket = async () => {
-    if (!pocketForm.name || !pocketForm.target_amount) return showToast('Nama dan Target wajib diisi!', 'warning');
-    setIsSavingPocket(true);
-    const payload = { name: pocketForm.name, icon: pocketForm.icon, target_amount: Number(pocketForm.target_amount), balance: Number(pocketForm.balance || 0), user_id: session?.user?.id };
-    let error;
-    if (editingPocketId) { const { error: updateError } = await supabase.from('pockets').update(payload).eq('id', editingPocketId); error = updateError; }
-    else { const { error: insertError } = await supabase.from('pockets').insert([payload]); error = insertError; }
-    setIsSavingPocket(false);
-    if (!error) {
-      setShowPocketModal(false); setEditingPocketId(null); setPocketForm({ name: '', icon: '🎯', target_amount: '', balance: '' }); fetchData(); showToast(editingPocketId ? 'Kantong diperbarui! 🎯' : 'Kantong berhasil dibuat! 🎯', 'success');
-    } else showToast('Gagal menyimpan kantong: ' + error.message, 'error');
+ const handleSavePocket = async () => {
+  if (!pocketForm.name || !pocketForm.target_amount) return;
+  setIsSavingPocket(true);
+  
+  const targetAmount = Number(pocketForm.target_amount);
+  const currentBalance = Number(pocketForm.balance || 0);
+
+  const payload = { 
+    name: pocketForm.name, 
+    icon: pocketForm.icon, 
+    target_amount: targetAmount, 
+    balance: currentBalance, 
+    user_id: session?.user?.id 
   };
+
+  const { error } = editingPocketId 
+    ? await supabase.from('pockets').update(payload).eq('id', editingPocketId)
+    : await supabase.from('pockets').insert([payload]);
+
+  setIsSavingPocket(false);
+
+  if (!error) {
+    // 🏆 CEK APAKAH TARGET KANTONG TERCAPAI
+    if (currentBalance >= targetAmount) {
+      fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: session.user.email,
+          type: 'goal_reached',
+          data: { 
+            pocketName: pocketForm.name, 
+            targetAmount: targetAmount 
+          }
+        })
+      }).catch(console.error);
+    }
+    
+    setShowPocketModal(false); fetchData(); showToast('Kantong disimpan!', 'success');
+  }
+};
 
   const handleEditPocket = (pocket: any) => { setEditingPocketId(pocket.id); setPocketForm({ name: pocket.name, icon: pocket.icon || '🎯', target_amount: pocket.target_amount.toString(), balance: pocket.balance.toString() }); setShowPocketModal(true); };
   const handleDeletePocket = async (id: string) => {
