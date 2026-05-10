@@ -97,6 +97,94 @@ export async function POST(req: Request) {
                 </div>
             </div>`;
         }
+        // 5. Goal Reached (Selebrasi Tabungan)
+        else if (type === 'goal_reached') {
+            const { pocketName, targetAmount } = data;
+            subject = `🎉 SELAMAT! Tabungan '${pocketName}' Tercapai!`;
+            htmlContent = `
+            <div style="${baseStyle}">
+                <div style="background: linear-gradient(135deg, #10B981, #059669); padding: 40px 20px;">
+                    <div style="font-size: 50px; margin-bottom: 10px;">🏆</div>
+                    <h1 style="color: #FFFFFF; margin: 0; font-size: 26px; font-weight: 900;">TARGET TERCAPAI!</h1>
+                </div>
+                <div style="padding: 30px; line-height: 1.6;">
+                    <p style="font-size: 16px;">Luar biasa, ${displayName}! Tabungan <strong>${pocketName}</strong> kamu telah menyentuh target 100% sebesar <strong>${formatIDR(targetAmount)}</strong>.</p>
+                    <p style="color: #64748B;">Kerja keras dan disiplinmu membuahkan hasil. Silakan cairkan impianmu sekarang! 🏖️🚀</p>
+                </div>
+            </div>`;
+        }
+        // 6. Anomaly Alert (Pengeluaran Besar)
+        else if (type === 'anomaly_alert') {
+            const { amount, category, description } = data;
+            subject = `🚨 PERINGATAN: Transaksi Besar Rp ${amount.toLocaleString('id-ID')} Terdeteksi!`;
+            htmlContent = `
+            <div style="${baseStyle}">
+                <div style="background: linear-gradient(135deg, #EF4444, #B91C1C); padding: 40px 20px;">
+                    <div style="font-size: 50px; margin-bottom: 10px;">💳</div>
+                    <h1 style="color: #FFFFFF; margin: 0; font-size: 26px; font-weight: 900;">TRANSAKSI ANOMALI</h1>
+                </div>
+                <div style="padding: 30px; line-height: 1.6;">
+                    <p style="font-size: 16px;">Sistem AI kami mendeteksi pengeluaran besar yang tidak biasa hari ini:</p>
+                    <div style="background: #FEF2F2; border: 1px solid #FECACA; padding: 15px; border-radius: 12px; margin: 20px 0;">
+                        <h2 style="color: #EF4444; font-size: 28px; margin: 0;">${formatIDR(amount)}</h2>
+                        <p style="color: #7F1D1D; margin: 5px 0 0 0; font-size: 14px;"><strong>Kategori:</strong> ${category}<br><strong>Catatan:</strong> ${description}</p>
+                    </div>
+                    <p style="color: #64748B;">Apakah ini benar kamu? Jika tidak, segera hubungi bank kamu. Jika iya, ingat rem sedikit pengeluaran bulan ini ya! 💸</p>
+                </div>
+            </div>`;
+        }
+        // 7. Bill Reminder (Jatuh Tempo Tagihan)
+        else if (type === 'bill_reminder') {
+            const { billName, amount, daysLeft } = data;
+            subject = `🔔 H-${daysLeft}: Tagihan ${billName} Segera Jatuh Tempo`;
+            htmlContent = `
+            <div style="${baseStyle}">
+                <div style="background: linear-gradient(135deg, #3B82F6, #2563EB); padding: 40px 20px;">
+                    <div style="font-size: 50px; margin-bottom: 10px;">📅</div>
+                    <h1 style="color: #FFFFFF; margin: 0; font-size: 26px; font-weight: 900;">REMINDER TAGIHAN</h1>
+                </div>
+                <div style="padding: 30px; line-height: 1.6;">
+                    <p style="font-size: 16px;">Halo ${displayName}, sekadar mengingatkan bahwa tagihanmu akan jatuh tempo dalam <strong>${daysLeft} hari</strong>:</p>
+                    <h2 style="color: #2563EB; font-size: 24px; margin: 15px 0;">${billName} - ${formatIDR(amount)}</h2>
+                    <p style="color: #64748B;">Pastikan saldomu cukup agar layanan tidak terputus dan tidak kena denda ya! ⚡</p>
+                </div>
+            </div>`;
+        }
+        // 8. Monthly Recap
+        else if (type === 'monthly_recap') {
+            const { monthName, totalIncome, totalExpense } = data;
+            const diff = totalIncome - totalExpense;
+            const isPositive = diff >= 0;
+            
+            subject = `📊 Rekap Finansial Bulan ${monthName} Kamu Sudah Siap!`;
+            htmlContent = `
+            <div style="${baseStyle}">
+                <div style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); padding: 40px 20px;">
+                    <div style="font-size: 50px; margin-bottom: 10px;">📈</div>
+                    <h1 style="color: #FFFFFF; margin: 0; font-size: 26px; font-weight: 900;">REKAP ${monthName.toUpperCase()}</h1>
+                </div>
+                <div style="padding: 30px; line-height: 1.6; text-align: left;">
+                    <p style="font-size: 16px; text-align: center;">Kerja bagus bulan ini, ${displayName}! Berikut adalah ringkasan arus kas kamu:</p>
+                    
+                    <div style="background: #F8FAFC; border-radius: 12px; padding: 15px; margin: 20px 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="color: #64748B;">Pemasukan:</span>
+                            <strong style="color: #10B981;">+ ${formatIDR(totalIncome)}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding-bottom: 10px; margin-bottom: 10px;">
+                            <span style="color: #64748B;">Pengeluaran:</span>
+                            <strong style="color: #EF4444;">- ${formatIDR(totalExpense)}</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #334155; font-weight: bold;">Sisa Uang:</span>
+                            <strong style="color: ${isPositive ? '#10B981' : '#EF4444'};">${isPositive ? '+' : ''} ${formatIDR(diff)}</strong>
+                        </div>
+                    </div>
+                    
+                    <p style="text-align: center; color: #64748B; font-size: 14px;">Mari persiapkan strategi finansial yang lebih baik untuk bulan depan! 💪</p>
+                </div>
+            </div>`;
+        }
 
         const { error } = await resend.emails.send({
             from: 'My Dompet Digital <no-reply@mydompetdigital.my.id>',

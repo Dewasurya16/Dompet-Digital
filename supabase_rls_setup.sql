@@ -88,5 +88,41 @@ CREATE POLICY "Users can delete their own investments"
   USING (auth.uid() = user_id);
 
 -- ================================================================
+-- 6. Buat Tabel BILLS (Manajemen Tagihan)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS bills (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  due_date INT NOT NULL, -- Tanggal jatuh tempo (1-31)
+  category TEXT DEFAULT 'Lainnya',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE bills ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view their own bills" ON bills;
+DROP POLICY IF EXISTS "Users can insert their own bills" ON bills;
+DROP POLICY IF EXISTS "Users can update their own bills" ON bills;
+DROP POLICY IF EXISTS "Users can delete their own bills" ON bills;
+
+CREATE POLICY "Users can view their own bills"
+  ON bills FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own bills"
+  ON bills FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own bills"
+  ON bills FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own bills"
+  ON bills FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- ================================================================
 -- SELESAI! Sekarang setiap user hanya bisa melihat data miliknya sendiri.
 -- ================================================================
