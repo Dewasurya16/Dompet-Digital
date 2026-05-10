@@ -10,10 +10,23 @@ import Swal from "sweetalert2";
 const Toast = Swal.mixin({
   toast: true, position: "top-end", showConfirmButton: false,
   timer: 3500, timerProgressBar: true,
+  background: '#FDFBF7',
+  color: '#0B3E3A',
+  customClass: { popup: 'border-[3px] border-[#0B3E3A] rounded-xl shadow-[4px_4px_0_0_#0B3E3A] font-black text-sm' },
   didOpen: (t) => { t.onmouseenter = Swal.stopTimer; t.onmouseleave = Swal.resumeTimer; },
 });
 const showToast = (icon: "success" | "error" | "info" | "warning", title: string) =>
   Toast.fire({ icon, title });
+
+const swalCartoon = {
+  background: '#FDFBF7',
+  color: '#0B3E3A',
+  customClass: {
+    popup: 'border-[4px] border-[#0B3E3A] rounded-2xl shadow-[8px_8px_0_0_#0B3E3A] font-black',
+    confirmButton: 'rounded-xl font-black border-[3px] border-[#0B3E3A] shadow-[3px_3px_0_0_#0B3E3A] px-6 py-3',
+    cancelButton: 'rounded-xl font-black border-[3px] border-[#0B3E3A] shadow-[3px_3px_0_0_#0B3E3A] px-6 py-3',
+  }
+};
 
 /* ── PLAYFUL, CARTOON-STYLE WALLET ILLUSTRATION ────────────── */
 function CartoonWalletIllustration() {
@@ -229,8 +242,10 @@ export default function LoginPage() {
     setLoading(true);
 
     if (useMagicLink) {
+      // Selalu redirect ke domain utama production
+      const redirectTo = 'https://www.mydompetdigital.my.id/dashboard';
       const { error } = await supabase.auth.signInWithOtp({
-        email, options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/dashboard` },
+        email, options: { shouldCreateUser: false, emailRedirectTo: redirectTo },
       });
       setLoading(false);
       if (error) {
@@ -238,9 +253,10 @@ export default function LoginPage() {
           ? "Email belum terdaftar. Daftar dulu ya!" : error.message);
       } else {
         await Swal.fire({
+          ...swalCartoon,
           icon: "success", title: "✨ Magic Link Terkirim!",
-          html: `<p style="color:#475569">Cek inbox kamu di <strong style="color:#0F766E">${email}</strong></p>`,
-          confirmButtonColor: "#0F766E", confirmButtonText: "Cek Email",
+          html: `<p style="color:#0B3E3A;font-weight:bold;">Cek inbox kamu di <strong style="color:#0F766E;">${email}</strong> dan klik link yang dikirim. Link akan redirect ke <strong>mydompetdigital.my.id</strong></p>`,
+          confirmButtonColor: "#10B981", confirmButtonText: "Oke, Cek Email! 📫",
         });
         setMagic(false);
       }
@@ -252,9 +268,10 @@ export default function LoginPage() {
       setLoading(false);
       if (error) { showToast("error", error.message); return; }
       await Swal.fire({
+        ...swalCartoon,
         icon: "success", title: "🎉 Akun Berhasil Dibuat!",
-        html: `<p style="color:#475569">Silakan masuk dengan akun baru kamu.</p>`,
-        confirmButtonColor: "#0F766E", confirmButtonText: "Masuk Sekarang",
+        html: `<p style="color:#0B3E3A;font-weight:bold;">Silakan masuk dengan akun baru kamu.</p>`,
+        confirmButtonColor: "#10B981", confirmButtonText: "Masuk Sekarang →",
       });
       fetch("/api/send-notification", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -268,10 +285,10 @@ export default function LoginPage() {
     setLoading(false);
     if (error) {
       await Swal.fire({
-        icon: "error", title: "Login Gagal",
-        text: "Email atau password salah.",
-        confirmButtonColor: "#0F766E",
-        footer: `<a href="#" style="color:#0F766E">Lupa password?</a>`,
+        ...swalCartoon,
+        icon: "error", title: "🚨 Login Gagal",
+        html: `<p style="color:#0B3E3A;font-weight:bold;">Email atau password salah. Coba lagi ya!</p>`,
+        confirmButtonColor: "#F43F5E", confirmButtonText: "Coba Lagi",
       });
     } else {
       showToast("success", "Selamat datang kembali! 👋");
@@ -280,10 +297,12 @@ export default function LoginPage() {
 
   const handleDemo = async () => {
     const r = await Swal.fire({
-      icon: "info", title: "Masuk sebagai Demo?",
-      text: "Gunakan akun demo dengan data contoh.",
-      showCancelButton: true, confirmButtonColor: "#0F766E",
-      cancelButtonColor: "#94A3B8", confirmButtonText: "Ya, Masuk Demo",
+      ...swalCartoon,
+      icon: "info", title: "🎮 Masuk sebagai Demo?",
+      html: `<p style="color:#0B3E3A;font-weight:bold;">Gunakan akun demo dengan data contoh.</p>`,
+      showCancelButton: true, confirmButtonColor: "#10B981",
+      cancelButtonColor: "#94A3B8", confirmButtonText: "Ya, Masuk Demo! ⚡",
+      cancelButtonText: "Batal",
     });
     if (!r.isConfirmed) return;
     setLoading(true);
@@ -307,7 +326,10 @@ export default function LoginPage() {
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-[#147067]/40 via-transparent to-transparent pointer-events-none" />
 
           {/* Logo */}
-          <div className="relative z-10 p-10 pb-0">
+          <div className="relative z-10 p-10 pb-0 flex items-center gap-3">
+            <div className="w-16 h-16 bg-white rounded-2xl border-[3px] border-white/40 shadow-[4px_4px_0_0_rgba(255,255,255,0.3)] flex items-center justify-center p-1.5 overflow-hidden shrink-0">
+              <img src="/logo.png" alt="Dompet Digital" className="w-full h-full object-contain" />
+            </div>
             <span className="text-3xl font-black text-white tracking-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
               Dompet<span className="text-[#FDE68A]">.</span>
             </span>
@@ -338,7 +360,10 @@ export default function LoginPage() {
           </Link>
 
           {/* Mobile logo */}
-          <div className="lg:hidden mb-4">
+          <div className="lg:hidden mb-4 flex items-center gap-3">
+            <div className="w-14 h-14 bg-white border-[3px] border-[#0B3E3A] rounded-2xl shadow-[3px_3px_0_0_#0B3E3A] flex items-center justify-center p-1.5 overflow-hidden shrink-0">
+              <img src="/logo.png" alt="Dompet Digital" className="w-full h-full object-contain" />
+            </div>
             <span className="text-3xl font-black text-[#0B3E3A]" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
               Dompet<span className="text-[#0F766E]">.</span>
             </span>

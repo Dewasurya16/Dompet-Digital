@@ -3,36 +3,26 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    // Tambahkan latitude & longitude untuk mendukung fitur GPS yang baru dibuat
     const { email, title, amount, type, category, wallet, refId, date, latitude, longitude } = body;
 
-    const formattedAmount = new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-    }).format(amount);
-
-    // Ekstrak nama dari email (contoh: budi@gmail.com jadi Budi)
+    const formattedAmount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
     const usernameRaw = email.split('@')[0];
     const displayName = usernameRaw.charAt(0).toUpperCase() + usernameRaw.slice(1);
-
     const isIncome = type === 'pemasukan';
 
-    // Palet Warna Comic / Brutalist
     const darkTeal = '#0B3E3A';
-    const mainBg = isIncome ? '#A7F3D0' : '#FECDD3'; // Hijau terang / Pink terang
+    const mainBg = isIncome ? '#A7F3D0' : '#FECDD3';
     const amountColor = isIncome ? '#10B981' : '#F43F5E';
     const iconSymbol = isIncome ? '↙ PEMASUKAN' : '↗ PENGELUARAN';
 
-    // Kata-kata ramah (Friendly Copywriting)
     const friendlyMessage = isIncome
       ? 'Wah, alhamdulillah ada dana masuk nih! Asik, saldo nambah makin tebal. 🎉'
       : 'Catatan pengeluaranmu sudah kami simpan. Tetap bijak berbelanja ya! 💸';
 
-    // Jika ada koordinat GPS, siapkan tombol peta
     const locationRow = (latitude && longitude) ? `
       <tr>
         <td style="padding: 16px 0; color: ${darkTeal}; font-weight: 800; border-top: 3px dashed ${darkTeal}40; text-transform: uppercase;">Lokasi</td>
@@ -57,6 +47,14 @@ export async function POST(req: Request) {
               
               <div style="max-width: 400px; margin: 0 auto;">
                 
+                <!-- LOGO HEADER -->
+                <div style="text-align: center; margin-bottom: 20px;">
+                  <div style="display:inline-block; background:#FFFFFF; border: 3px solid ${darkTeal}; border-radius: 16px; box-shadow: 4px 4px 0 0 ${darkTeal}; padding: 8px; margin-bottom:6px;">
+                    <img src="https://dompet-digital-fawn.vercel.app/logo.png" alt="Dompet Digital" style="width:56px;height:56px;object-fit:contain;display:block;" />
+                  </div>
+                  <div style="font-size: 22px; font-weight: 900; color: ${darkTeal}; letter-spacing: -0.5px;">Dompet<span style="color: #10B981;">.</span></div>
+                </div>
+
                 <div style="text-align: center; margin-bottom: 24px;">
                   <h2 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px;">
                     HALOO, ${displayName}! 👋

@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+
 // Helper untuk format Rupiah di dalam email
 const formatIDR = (amount: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
@@ -170,6 +171,14 @@ export async function POST(req: Request) {
         </head>
         <body style="font-family: 'Arial Black', Impact, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #FDFBF7; margin: 0; padding: 40px 15px; color: ${darkTeal};">
             <div style="max-width: 420px; margin: 0 auto; text-align: center;">
+
+                <!-- LOGO -->
+                <div style="margin-bottom: 20px;">
+                  <div style="display:inline-block; background:#FFFFFF; border: 3px solid ${darkTeal}; border-radius: 16px; box-shadow: 4px 4px 0 0 ${darkTeal}; padding: 6px; margin-bottom:6px;">
+                    <img src="https://dompet-digital-fawn.vercel.app/logo.png" alt="Dompet Digital Logo" style="width:56px;height:56px;object-fit:contain;display:block;" />
+                  </div>
+                  <div style="font-size: 22px; font-weight: 900; color: ${darkTeal}; letter-spacing: -0.5px;">Dompet<span style="color: #10B981;">.</span></div>
+                </div>
                 
                 <div style="background: #FFFFFF; border-radius: 16px; border: 4px solid ${darkTeal}; box-shadow: 8px 8px 0 0 ${darkTeal}; overflow: hidden;">
                     

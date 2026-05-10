@@ -12,7 +12,7 @@ import {
   Eye, EyeOff, Receipt, ShieldAlert, RefreshCw, Gem, Briefcase,
   AlertOctagon, CreditCard, MessageSquare, Landmark, Copy,
   TrendingUp, TrendingDown, BarChart3, PiggyBank, Check,
-  Bell, Info, Zap, Home, LayoutGrid, Camera, Lightbulb, MapPin
+  Bell, Info, Zap, Home, LayoutGrid, Camera, Lightbulb, MapPin, Mail, Users
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import jsPDF from 'jspdf';
@@ -139,6 +139,7 @@ export default function DashboardPage() {
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingPDFEmail, setIsSendingPDFEmail] = useState(false);
   const [useLocation, setUseLocation] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -372,6 +373,7 @@ export default function DashboardPage() {
     e.preventDefault(); if (!formData.title || !formData.amount) return;
     setIsSubmitting(true);
     let lat = formData.latitude, lng = formData.longitude;
+
     if (useLocation && !lat && !lng) {
       try {
         const pos = await new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 }));
@@ -380,7 +382,6 @@ export default function DashboardPage() {
     }
 
     const payload = { title: formData.title, amount: Number(formData.amount), type: formData.type, category: formData.category, wallet: formData.wallet, image_url: formData.image_url, person_name: formData.person_name, currency: formData.currency, original_amount: formData.original_amount ? Number(formData.original_amount) : null, latitude: lat, longitude: lng, user_id: session?.user?.id };
-    const oldNetWorth = stats.globalNetWorth;
 
     if (editingId) {
       const { error } = await supabase.from('transactions').update(payload).eq('id', editingId);
@@ -389,11 +390,94 @@ export default function DashboardPage() {
         setEditingId(null); setReceiptPreview(null); setFormData(DEFAULT_FORM); setUseLocation(false); fetchData(); showToast('Transaksi berhasil diperbarui!', 'success');
       } else showToast(`Gagal update: ${error.message}`, 'error');
     } else {
+      // 🚀 PROSES SIMPAN TRANSAKSI BARU
       const { data, error } = await supabase.from('transactions').insert([payload]).select().single();
       setIsSubmitting(false);
+
       if (!error && data) {
-        setFormData(DEFAULT_FORM); setUseLocation(false); setReceiptPreview(null); fetchData(); showToast('Transaksi berhasil disimpan! 🎉', 'success');
-      } else showToast(`Gagal simpan: ${error?.message}`, 'error');
+        if (session?.user?.email) {
+          // ✉️ TRIGGER 1: KIRIM EMAIL STRUK
+          fetch('/api/send-receipt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: session.user.email,
+              title: payload.title,
+              amount: payload.amount,
+              type: payload.type,
+              category: payload.category,
+              wallet: payload.wallet,
+              refId: data.id,
+              date: new Date().toLocaleString('id-ID'),
+              latitude: lat,
+              longitude: lng
+            })
+          }).catch(console.error);
+
+          // 🤖 TRIGGER 2: CEK BUDGET UNTUK NOTIFIKASI AI
+          if (payload.type === 'pengeluaran' && catBudgets[payload.category]) {
+            const limit = Number(catBudgets[payload.category]);
+            // Hitung total pengeluaran + transaksi baru
+            const spentSoFar = filteredTransactions.filter((t: any) => t.type === 'pengeluaran' && t.category === payload.category).reduce((acc: any, curr: any) => acc + Number(curr.amount), 0) + payload.amount;
+
+            // Jika lewat 90% dari budget, kirim email alert
+            if (spentSoFar >= limit * 0.9 && limit > 0) {
+              fetch('/api/send-notification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: session.user.email,
+                  type: 'budget_alert',
+                  data: { category: payload.category, spent: spentSoFar, limit: limit, personality: aiPersonality }
+                })
+              }).catch(console.error);
+            }
+          }
+
+          // 🚨 TRIGGER 3: CEK SALDO KAS/DOMPET MINUS (KAS MERAH)
+          const currentWalletBalance = walletBreakdown.find((w: any) => w.name === payload.wallet)?.balance || 0;
+          const newWalletBalance = payload.type === 'pengeluaran' ? currentWalletBalance - payload.amount : currentWalletBalance + payload.amount;
+
+          if (newWalletBalance < 0 && payload.type === 'pengeluaran') {
+            fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: session.user.email,
+                type: 'anomaly_alert',
+                data: {
+                  amount: payload.amount,
+                  category: 'SALDO MINUS',
+                  description: `Awas! Pengeluaran ini membuat saldo ${payload.wallet} kamu jadi minus/berdarah (Defisit). Segera cek keuanganmu!`
+                }
+              })
+            }).catch(console.error);
+          }
+
+          // 🏆 TRIGGER 4: TARGET IMPIAN UTAMA TERCAPAI
+          const currentNetWorth = stats.globalNetWorth;
+          const target = Number(targetSaving);
+
+          if (currentNetWorth < target && (currentNetWorth + payload.amount) >= target && payload.type === 'pemasukan') {
+            fetch('/api/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: session.user.email,
+                type: 'goal_reached',
+                data: {
+                  pocketName: 'Target Kekayaan Impian',
+                  targetAmount: target
+                }
+              })
+            }).catch(console.error);
+          }
+        }
+
+        setFormData(DEFAULT_FORM); setUseLocation(false); setReceiptPreview(null); fetchData(); showToast('Transaksi disimpan & Email dikirim! 🎉', 'success');
+      } else {
+        showToast(`Gagal simpan: ${error?.message}`, 'error');
+      }
     }
   };
 
@@ -429,16 +513,45 @@ export default function DashboardPage() {
   };
 
   const handleSavePocket = async () => {
-    if (!pocketForm.name || !pocketForm.target_amount) return showToast('Nama dan Target wajib diisi!', 'warning');
+    if (!pocketForm.name || !pocketForm.target_amount) return;
     setIsSavingPocket(true);
-    const payload = { name: pocketForm.name, icon: pocketForm.icon, target_amount: Number(pocketForm.target_amount), balance: Number(pocketForm.balance || 0), user_id: session?.user?.id };
-    let error;
-    if (editingPocketId) { const { error: updateError } = await supabase.from('pockets').update(payload).eq('id', editingPocketId); error = updateError; }
-    else { const { error: insertError } = await supabase.from('pockets').insert([payload]); error = insertError; }
+
+    const targetAmount = Number(pocketForm.target_amount);
+    const currentBalance = Number(pocketForm.balance || 0);
+
+    const payload = {
+      name: pocketForm.name,
+      icon: pocketForm.icon,
+      target_amount: targetAmount,
+      balance: currentBalance,
+      user_id: session?.user?.id
+    };
+
+    const { error } = editingPocketId
+      ? await supabase.from('pockets').update(payload).eq('id', editingPocketId)
+      : await supabase.from('pockets').insert([payload]);
+
     setIsSavingPocket(false);
+
     if (!error) {
-      setShowPocketModal(false); setEditingPocketId(null); setPocketForm({ name: '', icon: '🎯', target_amount: '', balance: '' }); fetchData(); showToast(editingPocketId ? 'Kantong diperbarui! 🎯' : 'Kantong berhasil dibuat! 🎯', 'success');
-    } else showToast('Gagal menyimpan kantong: ' + error.message, 'error');
+      // 🏆 CEK APAKAH TARGET KANTONG TERCAPAI
+      if (currentBalance >= targetAmount) {
+        fetch('/api/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: session.user.email,
+            type: 'goal_reached',
+            data: {
+              pocketName: pocketForm.name,
+              targetAmount: targetAmount
+            }
+          })
+        }).catch(console.error);
+      }
+
+      setShowPocketModal(false); fetchData(); showToast('Kantong disimpan!', 'success');
+    }
   };
 
   const handleEditPocket = (pocket: any) => { setEditingPocketId(pocket.id); setPocketForm({ name: pocket.name, icon: pocket.icon || '🎯', target_amount: pocket.target_amount.toString(), balance: pocket.balance.toString() }); setShowPocketModal(true); };
@@ -614,30 +727,176 @@ export default function DashboardPage() {
     return insights;
   }, [stats, catBudgets, filteredTransactions, aiPersonality]);
 
-  const exportPDF = async () => {
+  const buildPDFDoc = async () => {
     const doc = new jsPDF();
-    doc.setFillColor(11, 62, 58); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(22); doc.setFont("helvetica", "bold"); doc.text("Laporan Keuangan", 14, 22);
-    doc.setFontSize(10); doc.setFont("helvetica", "normal");
     const periodText = filterMode === 'month' ? (filterMonth === 'all' ? 'Semua Waktu' : parseMonthSafe(filterMonth).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })) : `${customStartDate} s/d ${customEndDate}`;
-    doc.text(`Periode: ${periodText}  |  ${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}`, 14, 32);
-    doc.setTextColor(11, 62, 58); doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.text("RINGKASAN:", 14, 52);
-    doc.setFontSize(10); doc.setFont("helvetica", "normal");
-    doc.text(`Total Pemasukan Bersih`, 14, 60); doc.text(`:  ${formatIDR(stats.income)}`, 70, 60);
-    doc.text(`Total Pengeluaran Konsumsi`, 14, 66); doc.text(`:  ${formatIDR(stats.expense)}`, 70, 66);
-    doc.setFont("helvetica", "bold"); doc.setTextColor(16, 185, 129);
-    doc.text(`Total Aset (Investasi)`, 14, 74); doc.text(`:  ${formatIDR(stats.totalAssets)}`, 70, 74);
-    doc.setTextColor(stats.netWorth >= 0 ? 16 : 244, stats.netWorth >= 0 ? 185 : 63, stats.netWorth >= 0 ? 129 : 94);
-    doc.text(`TOTAL KEKAYAAN`, 14, 82); doc.text(`:  ${formatIDR(stats.netWorth)}`, 70, 82);
+
+    // ── HEADER KOMIK ──────────────────────────────
+    // Background header kuning (tema kartun)
+    doc.setFillColor(253, 230, 138); // #FDE68A
+    doc.rect(0, 0, 210, 50, 'F');
+    // Border bawah header
+    doc.setDrawColor(11, 62, 58);
+    doc.setLineWidth(2);
+    doc.line(0, 50, 210, 50);
+
+    // ── LOGO DI HEADER ────────────────────────────
+    try {
+      const resp = await fetch('/logo.png');
+      const blob = await resp.blob();
+      const logoB64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(165, 8, 34, 34, 4, 4, 'F');
+      doc.setDrawColor(11, 62, 58);
+      doc.setLineWidth(1.5);
+      doc.roundedRect(165, 8, 34, 34, 4, 4, 'S');
+      // Shadow Logo
+      doc.setDrawColor(11, 62, 58);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(167, 10, 34, 34, 4, 4, 'S');
+      doc.addImage(logoB64, 'PNG', 167, 10, 30, 30);
+    } catch { /* skip */ }
+
+    // Judul
+    doc.setTextColor(11, 62, 58);
+    doc.setFontSize(26);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LAPORAN KEUANGAN', 14, 24);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Dicetak pada : ${new Date().toLocaleDateString('id-ID')} • Oleh: Dompet Digital`, 14, 34);
+    doc.text(`Periode      : ${periodText}`, 14, 42);
+
+    // ── BOX KEKAYAAN BERSIH ───────────────────────
+    const summaryY = 60;
+    doc.setFillColor(167, 243, 208); // Hijau terang
+    doc.roundedRect(14, summaryY, 182, 36, 4, 4, 'F');
+    doc.setDrawColor(11, 62, 58);
+    doc.setLineWidth(1.5);
+    doc.roundedRect(14, summaryY, 182, 36, 4, 4, 'S');
+    // Shadow box
+    doc.setDrawColor(11, 62, 58);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(16, summaryY + 2, 182, 36, 4, 4, 'S');
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(11, 62, 58);
+    doc.text('TOTAL KEKAYAAN BERSIH', 20, summaryY + 12);
+    
+    doc.setFontSize(22);
+    doc.setTextColor(stats.netWorth >= 0 ? 11 : 244, stats.netWorth >= 0 ? 62 : 63, stats.netWorth >= 0 ? 58 : 94);
+    doc.text(formatIDR(stats.netWorth), 20, summaryY + 26);
+
+    // Info Samping
+    doc.setFontSize(10);
+    doc.setTextColor(11, 62, 58);
+    doc.text('Pemasukan :', 110, summaryY + 14);
+    doc.text('Pengeluaran :', 110, summaryY + 22);
+    doc.text('Aset / Invest :', 110, summaryY + 30);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatIDR(stats.income), 140, summaryY + 14);
+    doc.text(formatIDR(stats.expense), 140, summaryY + 22);
+    doc.text(formatIDR(stats.totalAssets), 140, summaryY + 30);
+
+    // ── TABEL TRANSAKSI ───────────────────────────
     autoTable(doc, {
-      startY: 90, head: [['Tanggal', 'Keterangan', 'Sumber Dana', 'Kategori', 'Tipe', 'Jumlah (Rp)']],
-      body: filteredTransactions.map(t => [new Date(t.created_at).toLocaleDateString('id-ID'), t.title, t.wallet || 'Tunai', t.category, t.type === 'pemasukan' ? 'Pemasukan' : 'Pengeluaran', new Intl.NumberFormat('id-ID').format(Number(t.amount))]),
-      theme: 'grid', headStyles: { fillColor: [11, 62, 58], textColor: 255, fontStyle: 'bold' },
-      columnStyles: { 5: { halign: 'right' } }, styles: { fontSize: 9, cellPadding: 3 }, alternateRowStyles: { fillColor: [248, 250, 252] }
+      startY: summaryY + 46,
+      head: [['Tanggal', 'Keterangan', 'Kategori', 'Sumber', 'Tipe', 'Jumlah (Rp)']],
+      body: filteredTransactions.map(t => [
+        new Date(t.created_at).toLocaleDateString('id-ID'),
+        t.title.length > 25 ? t.title.substring(0, 25) + '...' : t.title, 
+        t.category,
+        t.wallet || 'Tunai', 
+        t.type === 'pemasukan' ? 'Masuk' : 'Keluar',
+        new Intl.NumberFormat('id-ID').format(Number(t.amount))
+      ]),
+      theme: 'grid',
+      styles: { 
+        cellPadding: 5, 
+        fontSize: 10, 
+        textColor: [11, 62, 58], 
+        lineColor: [11, 62, 58], 
+        lineWidth: 0.5,
+        font: 'helvetica'
+      },
+      headStyles: { 
+        fillColor: [253, 230, 138], // Kuning kartun
+        textColor: [11, 62, 58], 
+        fontStyle: 'bold', 
+        fontSize: 11, 
+        halign: 'center',
+        lineWidth: 1
+      },
+      columnStyles: { 
+        0: { cellWidth: 25 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 28 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
+        5: { cellWidth: 35, halign: 'right', fontStyle: 'bold' } 
+      },
+      alternateRowStyles: { fillColor: [253, 251, 247] },
+      didParseCell: (data: any) => {
+        // Beri warna hijau/merah pada teks Tipe & Jumlah
+        if (data.section === 'body') {
+          const typeVal = data.row.raw[4];
+          if (data.column.index === 4 || data.column.index === 5) {
+            data.cell.styles.textColor = typeVal === 'Masuk' ? [16, 185, 129] : [244, 63, 94];
+          }
+        }
+      }
     });
+
+    // ── FOOTER ───────────────────────────────────
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(11, 62, 58);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Dompet Digital  •  Halaman ${i} dari ${pageCount}`, 14, 290);
+      doc.text('mydompetdigital.my.id', 150, 290);
+    }
+    return doc;
+  };
+
+  const exportPDF = async () => {
+    const doc = await buildPDFDoc();
     const filename = `Laporan_Keuangan_${Date.now()}.pdf`;
     doc.save(filename);
-    showToast('PDF berhasil diunduh!', 'success');
+    showToast('PDF berhasil diunduh! 🎉', 'success');
+  };
+
+  const exportPDFEmail = async () => {
+    if (!session?.user?.email) return;
+    setIsSendingPDFEmail(true);
+    showToast('Mempersiapkan PDF...', 'info');
+    try {
+      const doc = await buildPDFDoc();
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      const filename = `Laporan_Keuangan_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.pdf`;
+      const res = await fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: session.user.email,
+          type: 'report',
+          attachmentBase64: pdfBase64,
+          filename
+        })
+      });
+      if (res.ok) showToast('PDF berhasil dikirim ke email! 📧', 'success');
+      else showToast('Gagal kirim email PDF.', 'error');
+    } catch {
+      showToast('Terjadi kesalahan.', 'error');
+    }
+    setIsSendingPDFEmail(false);
   };
 
   const exportCSV = async () => {
@@ -698,8 +957,8 @@ export default function DashboardPage() {
       {/* ═══ DESKTOP SIDEBAR (COMIC STYLE) ═══ */}
       <aside className="hidden lg:flex flex-col fixed left-0 top-0 bottom-0 w-[260px] bg-white dark:bg-[#0B3E3A] border-r-[4px] border-[#0B3E3A] dark:border-white z-50 p-6 overflow-y-auto">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-12 h-12 bg-[#10B981] border-[3px] border-[#0B3E3A] dark:border-white rounded-xl flex items-center justify-center shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF] -rotate-3">
-            <Wallet size={24} className="text-[#0B3E3A] dark:text-white" />
+          <div className="w-16 h-16 bg-white border-[3px] border-[#0B3E3A] dark:border-white rounded-2xl shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF] -rotate-3 flex items-center justify-center p-1 overflow-hidden shrink-0">
+            <img src="/logo.png" alt="Dompet Digital" className="w-full h-full object-contain" />
           </div>
           <span className="text-2xl font-black tracking-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>Dompet<span className="text-[#10B981]">.</span></span>
         </div>
@@ -755,8 +1014,8 @@ export default function DashboardPage() {
         <header className="lg:hidden sticky top-0 z-40 bg-[#FDFBF7] dark:bg-[#062623] border-b-[4px] border-[#0B3E3A] dark:border-white px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#10B981] border-[3px] border-[#0B3E3A] dark:border-white rounded-xl flex items-center justify-center shadow-[3px_3px_0_0_#0B3E3A] dark:shadow-[3px_3px_0_0_#FFFFFF]">
-                <Wallet size={18} className="text-[#0B3E3A] dark:text-white" strokeWidth={2.5} />
+              <div className="w-12 h-12 bg-white border-[3px] border-[#0B3E3A] dark:border-white rounded-xl shadow-[3px_3px_0_0_#0B3E3A] dark:shadow-[3px_3px_0_0_#FFFFFF] flex items-center justify-center p-1 overflow-hidden shrink-0">
+                <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wide opacity-70">Welcome back,</p>
@@ -993,6 +1252,14 @@ export default function DashboardPage() {
                       <SelectInput label="Kategori" value={formData.category} onChange={(v: string) => setFormData({ ...formData, category: v })} options={formData.type === 'pengeluaran' ? ['Makanan', 'Transportasi', 'Tagihan', 'Belanja', 'Hiburan', 'Investasi', 'Beri Hutang', 'Bayar Pinjaman', 'Lainnya'] : ['Gaji Pokok', 'Bonus', 'Investasi', 'Terima Pinjaman', 'Dibayar Hutang', 'Lainnya']} />
                       <SelectInput label="Sumber Dana" value={formData.wallet} onChange={(v: string) => setFormData({ ...formData, wallet: v })} options={WALLET_OPTIONS} />
                     </div>
+
+                    {/* ── FIELD NAMA ORANG (HUTANG/PINJAMAN) ── */}
+                    {['Beri Hutang', 'Bayar Pinjaman', 'Terima Pinjaman', 'Dibayar Hutang'].includes(formData.category) && (
+                      <div className="p-4 bg-[#FDE68A] border-[3px] border-[#0B3E3A] dark:border-white rounded-xl shadow-[3px_3px_0_0_#0B3E3A] dark:shadow-[3px_3px_0_0_#FFFFFF]">
+                        <p className="text-xs font-black text-[#0B3E3A] uppercase tracking-wide mb-2 flex items-center gap-2"><Users size={14} strokeWidth={3} /> Nama Orang (Wajib untuk Hutang!)</p>
+                        <FormInput label="" icon={<Users size={18} strokeWidth={3} />} type="text" placeholder="Nama teman/saudara..." value={formData.person_name} onChange={(v: string) => setFormData({ ...formData, person_name: v })} />
+                      </div>
+                    )}
 
                     {/* ── TOMBOL GPS ── */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mt-4 mb-2">
@@ -1353,11 +1620,24 @@ export default function DashboardPage() {
 
             {/* Export */}
             <div className="bg-white dark:bg-[#0B3E3A] border-[4px] border-[#0B3E3A] dark:border-white p-6 rounded-2xl shadow-[6px_6px_0_0_#0B3E3A] dark:shadow-[6px_6px_0_0_#FFFFFF] mb-8">
-              <h3 className="font-black text-xl uppercase mb-4 text-[#0B3E3A] dark:text-white border-b-[3px] border-[#0B3E3A] dark:border-white pb-3">Export Data</h3>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button onClick={exportPDF} className="flex-1 flex items-center justify-center gap-2 bg-[#FDE68A] text-[#0B3E3A] font-black py-4 rounded-xl border-[4px] border-[#0B3E3A] shadow-[4px_4px_0_0_#0B3E3A] hover:bg-[#FCD34D] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0B3E3A] active:shadow-none transition-all uppercase"><FileText size={20} strokeWidth={3} /> PDF</button>
-                <button onClick={exportCSV} className="flex-1 flex items-center justify-center gap-2 bg-[#A7F3D0] text-[#0B3E3A] font-black py-4 rounded-xl border-[4px] border-[#0B3E3A] shadow-[4px_4px_0_0_#0B3E3A] hover:bg-[#6EE7B7] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0B3E3A] active:shadow-none transition-all uppercase"><Download size={20} strokeWidth={3} /> CSV</button>
-                <button onClick={exportWA} className="flex-1 flex items-center justify-center gap-2 bg-[#BAE6FD] text-[#0B3E3A] font-black py-4 rounded-xl border-[4px] border-[#0B3E3A] shadow-[4px_4px_0_0_#0B3E3A] hover:bg-[#7DD3FC] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0B3E3A] active:shadow-none transition-all uppercase"><MessageSquare size={20} strokeWidth={3} /> WhatsApp</button>
+              <h3 className="font-black text-xl uppercase mb-4 text-[#0B3E3A] dark:text-white border-b-[3px] border-[#0B3E3A] dark:border-white pb-3">🎉 Export Data</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <button onClick={exportPDF} className="flex flex-col items-center justify-center gap-2 bg-[#FDE68A] text-[#0B3E3A] font-black py-5 px-3 rounded-xl border-[4px] border-[#0B3E3A] shadow-[4px_4px_0_0_#0B3E3A] hover:bg-[#FCD34D] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0B3E3A] active:shadow-none transition-all uppercase text-xs">
+                  <FileText size={24} strokeWidth={3} />
+                  UNDUH PDF
+                </button>
+                <button onClick={exportPDFEmail} disabled={isSendingPDFEmail} className="flex flex-col items-center justify-center gap-2 bg-[#DDD6FE] text-[#0B3E3A] font-black py-5 px-3 rounded-xl border-[4px] border-[#0B3E3A] shadow-[4px_4px_0_0_#0B3E3A] hover:bg-[#C4B5FD] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0B3E3A] active:shadow-none transition-all uppercase text-xs disabled:opacity-60">
+                  {isSendingPDFEmail ? <Loader2 size={24} strokeWidth={3} className="animate-spin" /> : <Mail size={24} strokeWidth={3} />}
+                  {isSendingPDFEmail ? 'KIRIM...' : 'EMAIL PDF'}
+                </button>
+                <button onClick={exportCSV} className="flex flex-col items-center justify-center gap-2 bg-[#A7F3D0] text-[#0B3E3A] font-black py-5 px-3 rounded-xl border-[4px] border-[#0B3E3A] shadow-[4px_4px_0_0_#0B3E3A] hover:bg-[#6EE7B7] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0B3E3A] active:shadow-none transition-all uppercase text-xs">
+                  <Download size={24} strokeWidth={3} />
+                  CSV
+                </button>
+                <button onClick={exportWA} className="flex flex-col items-center justify-center gap-2 bg-[#BAE6FD] text-[#0B3E3A] font-black py-5 px-3 rounded-xl border-[4px] border-[#0B3E3A] shadow-[4px_4px_0_0_#0B3E3A] hover:bg-[#7DD3FC] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0B3E3A] active:shadow-none transition-all uppercase text-xs">
+                  <MessageSquare size={24} strokeWidth={3} />
+                  WHATSAPP
+                </button>
               </div>
             </div>
           </>}
