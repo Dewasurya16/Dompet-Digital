@@ -15,8 +15,8 @@ const Toast = Swal.mixin({
 const showToast = (icon: "success" | "error" | "info" | "warning", title: string) =>
   Toast.fire({ icon, title });
 
-/* ── ELEGANT WALLET ILLUSTRATION ────────────────────────────── */
-function WalletIllustration() {
+/* ── PLAYFUL, CARTOON-STYLE WALLET ILLUSTRATION ────────────── */
+function CartoonWalletIllustration() {
   return (
     <svg viewBox="0 0 420 500" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full max-h-[420px]">
       <defs>
@@ -37,14 +37,55 @@ function WalletIllustration() {
           <stop offset="100%" stopColor="#042F2E" />
         </radialGradient>
         <style>{`
-          @keyframes f1 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-          @keyframes f2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
-          @keyframes f3 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
-          @keyframes ps  { 0%,100%{opacity:.3;r:3} 50%{opacity:1;r:5} }
-          .fl1{animation:f1 4s ease-in-out infinite}
-          .fl2{animation:f2 5s ease-in-out .8s infinite}
-          .fl3{animation:f3 3.5s ease-in-out .4s infinite}
-          .fl4{animation:f2 6s ease-in-out 1.5s infinite}
+          /* Pronounced, bouncy bobbing (vertical) */
+          @keyframes p-bob-vert {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-30px); }
+          }
+          /* Pronounced vertical jump with tilt */
+          @keyframes p-bounce-vert-tilt {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-10px) rotate(5deg); }
+            50% { transform: translateY(-35px) rotate(0deg); }
+          }
+          /* Pronounced horizontal wobble */
+          @keyframes p-wobble-hor {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(15px); }
+          }
+          /* Subtle continuous spin */
+          @keyframes p-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          /* Wiggle effect for items */
+          @keyframes p-wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(7deg); }
+            75% { transform: rotate(-7deg); }
+          }
+          /* Fast and energetic pulsate */
+          @keyframes p-energetic-pulsate {
+            0%, 100% { opacity: 0.2; r: 3; }
+            50% { opacity: 1; r: 6; }
+          }
+          
+          /* Animation Classes */
+          .anim-bob-vert { animation: p-bob-vert 4s ease-in-out infinite; }
+          .anim-bounce-vert-tilt { animation: p-bounce-vert-tilt 4s ease-in-out infinite; }
+          .anim-wobble-hor { animation: p-wobble-hor 5s ease-in-out infinite; }
+          .anim-spin-item { animation: p-spin 10s linear infinite; transform-origin: center; }
+          .anim-wiggle-item { animation: p-wiggle 3s ease-in-out infinite; }
+          .anim-pulsate-stars { animation: p-energetic-pulsate 1.5s ease-in-out infinite; }
+
+          /* Adding staggered delays for a more alive feel */
+          .anim-delay-05s { animation-delay: 0.5s; }
+          .anim-delay-1s { animation-delay: 1s; }
+          .anim-delay-15s { animation-delay: 1.5s; }
+          
+          /* Ensuring transform-origin is set for local items like coins, cards, etc. */
+          g.anim-wiggle-item, g.anim-spin-item { transform-origin: center; }
+          
         `}</style>
       </defs>
 
@@ -52,34 +93,34 @@ function WalletIllustration() {
       <path d="M 0 350 Q 150 250 420 350 L 420 500 L 0 500 Z" fill="rgba(255,255,255,0.03)" />
       <path d="M 0 400 Q 200 300 420 450 L 420 500 L 0 500 Z" fill="rgba(255,255,255,0.02)" />
 
-      {/* Subtle Stars/Sparks */}
+      {/* Pulsating Stars/Sparks */}
       {[[340, 430, 4], [55, 210, 3], [390, 200, 4], [160, 80, 5]].map(([x, y, r], i) => (
-        <circle key={i} cx={x} cy={y} r={r} fill="#FDE68A"
-          style={{ animation: `ps ${2 + i * 0.5}s ease-in-out ${i * 0.4}s infinite` }} />
+        <circle key={i} cx={x} cy={y} r={r} fill="#FDE68A" className={`anim-pulsate-stars anim-delay-${i * 5}s`}
+          style={{ animationDelay: `${i * 0.3}s` }} />
       ))}
 
       {/* Bronze Coin (Rp) */}
-      <g className="fl3">
+      <g className="anim-bounce-vert-tilt anim-wiggle-item anim-delay-05s" style={{ transformOrigin: "80px 180px" }}>
         <circle cx="80" cy="180" r="30" fill="url(#cbronze)" />
         <circle cx="80" cy="180" r="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
         <text x="80" y="186" textAnchor="middle" fontSize="16" fontWeight="900" fill="#FEF2F2">Rp</text>
       </g>
 
       {/* Gold Coin ($) */}
-      <g className="fl2">
+      <g className="anim-bounce-vert-tilt anim-wiggle-item anim-spin-item" style={{ transformOrigin: "280px 110px" }}>
         <circle cx="280" cy="110" r="26" fill="url(#cgold)" />
         <circle cx="280" cy="110" r="20" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
         <text x="280" y="116" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#78350F">$</text>
       </g>
 
       {/* Mini Gold Coin (¥) */}
-      <g className="fl4">
+      <g className="anim-wobble-hor anim-wiggle-item anim-delay-15s" style={{ transformOrigin: "160px 130px" }}>
         <circle cx="160" cy="130" r="18" fill="url(#cgold)" />
         <text x="160" y="135" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#78350F">¥</text>
       </g>
 
       {/* Receipt Card */}
-      <g className="fl4" style={{ transformOrigin: "320px 280px" }}>
+      <g className="anim-bob-vert anim-wiggle-item anim-delay-1s" style={{ transformOrigin: "320px 280px" }}>
         <rect x="270" y="220" width="100" height="130" rx="6" fill="#F8FAFC" opacity="0.95" />
         <text x="320" y="245" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#0F4C46">Receipt</text>
         <rect x="285" y="255" width="70" height="2" fill="#CBD5E1" />
@@ -90,7 +131,7 @@ function WalletIllustration() {
       </g>
 
       {/* Bar Chart Element */}
-      <g className="fl2">
+      <g className="anim-wobble-hor anim-wiggle-item">
         <rect x="40" y="290" width="100" height="90" rx="12" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
         <rect x="55" y="340" width="12" rx="3" height="25" fill="#6EE7B7" />
         <rect x="75" y="320" width="12" rx="3" height="45" fill="#34D399" />
@@ -101,7 +142,8 @@ function WalletIllustration() {
       {/* Main Wallet Base */}
       <ellipse cx="210" cy="360" rx="100" ry="15" fill="rgba(0,0,0,0.2)" />
 
-      <g className="fl1">
+      {/* Wallet Body with pronounced vertical bob */}
+      <g className="anim-bob-vert anim-wiggle-item" style={{ transformOrigin: "210px 180px" }}>
         {/* Wallet Back */}
         <rect x="110" y="180" width="200" height="140" rx="16" fill="#063430" />
         {/* Cash inside */}
@@ -120,7 +162,7 @@ function WalletIllustration() {
       </g>
 
       {/* Floating Emerald Card */}
-      <g className="fl3">
+      <g className="anim-bounce-vert-tilt anim-wiggle-item anim-delay-05s" style={{ transformOrigin: "280px 380px" }}>
         <rect x="220" y="340" width="120" height="75" rx="8" fill="url(#ccard)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
         <text x="235" y="360" fontSize="10" fontWeight="bold" fill="#F1F5F9" letterSpacing="1">Emerald Card</text>
         {/* Chip */}
@@ -143,7 +185,7 @@ function FormInput({
 }) {
   return (
     <div>
-      <div className="flex justify-between items-center mb-2">
+      <div className="flex justify-between items-center mb-1.5">
         <label className="text-[13px] font-semibold text-[#0B3E3A]">{label}</label>
         {hint}
       </div>
@@ -154,7 +196,7 @@ function FormInput({
           required type={type} placeholder={placeholder}
           value={value} onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          className="flex-1 px-4 py-3.5 text-sm font-medium text-[#0B3E3A] placeholder:text-[#94A3B8] outline-none bg-transparent disabled:opacity-50"
+          className="flex-1 px-4 py-3 text-sm font-medium text-[#0B3E3A] placeholder:text-[#94A3B8] outline-none bg-transparent disabled:opacity-50"
         />
         {right}
       </div>
@@ -252,11 +294,11 @@ export default function LoginPage() {
 
   return (
     <div
-      className="min-h-screen bg-[#F0EEE4] flex items-center justify-center p-4 sm:p-8"
+      className="min-h-screen bg-[#F0EEE4] flex items-center justify-center p-4 sm:p-6"
       style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
     >
       {/* ── CARD ───────────────────────────────────────────────── */}
-      <div className="w-full max-w-[980px] bg-[#FBF9F1] rounded-[24px] shadow-2xl shadow-[#0B3E3A]/10 overflow-hidden flex relative border border-[#E5E0D8]" style={{ minHeight: 640 }}>
+      <div className="w-full max-w-[980px] bg-[#FBF9F1] rounded-[24px] shadow-2xl shadow-[#0B3E3A]/10 overflow-hidden flex relative border border-[#E5E0D8]" style={{ minHeight: 600 }}>
 
         {/* ── LEFT PANEL ──────────────────────────────────────── */}
         <div className="hidden lg:flex lg:w-[45%] flex-col relative overflow-hidden bg-gradient-to-br from-[#0F4C46] to-[#062623]">
@@ -271,9 +313,9 @@ export default function LoginPage() {
             </span>
           </div>
 
-          {/* Illustration */}
+          {/* Illustration with new cartoon-style animations */}
           <div className="flex-1 flex items-center justify-center px-6 relative z-10">
-            <WalletIllustration />
+            <CartoonWalletIllustration />
           </div>
 
           {/* Tagline */}
@@ -284,28 +326,28 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* ── RIGHT PANEL ─────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 py-12 relative">
+        {/* ── RIGHT PANEL (Tightened Layout) ───────────────────── */}
+        <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 py-8 relative">
 
           {/* Close button */}
           <Link
             href="/"
-            className="absolute top-8 right-8 w-10 h-10 rounded-full bg-white border border-[#E2E8F0] hover:border-[#CBD5E1] flex items-center justify-center text-[#64748B] hover:text-[#0F766E] transition-all shadow-sm"
+            className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white border border-[#E2E8F0] hover:border-[#CBD5E1] flex items-center justify-center text-[#64748B] hover:text-[#0F766E] transition-all shadow-sm"
           >
             <X size={18} />
           </Link>
 
           {/* Mobile logo */}
-          <div className="lg:hidden mb-8">
+          <div className="lg:hidden mb-4">
             <span className="text-3xl font-black text-[#0B3E3A]" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
               Dompet<span className="text-[#0F766E]">.</span>
             </span>
           </div>
 
           {/* Title */}
-          <div className="mb-10">
+          <div className="mb-6">
             <h1
-              className="text-4xl sm:text-[42px] font-black text-[#0B3E3A] mb-3 leading-tight"
+              className="text-4xl sm:text-[40px] font-black text-[#0B3E3A] mb-1.5 leading-tight"
               style={{ fontFamily: "'Fraunces', Georgia, serif" }}
             >
               {isRegistering ? "Create Account" : useMagicLink ? "Magic Link" : "Welcome to Dompet."}
@@ -320,7 +362,7 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleAuth} className="space-y-5">
+          <form onSubmit={handleAuth} className="space-y-4">
             <FormInput
               label="Email Address"
               icon={<Mail size={18} />}
@@ -354,7 +396,7 @@ export default function LoginPage() {
             {/* Submit */}
             <button
               type="submit" disabled={loading}
-              className="w-full py-4 mt-2 rounded-xl bg-[#0B3E3A] hover:bg-[#072926] active:scale-[0.98] text-white font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full py-3 mt-2 rounded-xl bg-[#0B3E3A] hover:bg-[#072926] active:scale-[0.98] text-white font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading
                 ? <Loader2 size={18} className="animate-spin" />
@@ -367,7 +409,7 @@ export default function LoginPage() {
           {/* Alt options */}
           {!isRegistering && (
             <>
-              <div className="flex items-center gap-4 my-8">
+              <div className="flex items-center gap-4 my-5">
                 <div className="flex-1 h-px bg-[#E2E8F0]" />
                 <span className="text-[11px] uppercase tracking-widest text-[#94A3B8] font-bold">Or Continue With</span>
                 <div className="flex-1 h-px bg-[#E2E8F0]" />
@@ -376,7 +418,7 @@ export default function LoginPage() {
               <div className="space-y-3">
                 {/* Magic Link */}
                 <button type="button" disabled={loading} onClick={() => setMagic(!useMagicLink)}
-                  className={`w-full p-4 rounded-xl border transition-all flex items-center gap-4 group ${useMagicLink
+                  className={`w-full p-3 rounded-xl border transition-all flex items-center gap-4 group ${useMagicLink
                     ? "border-[#0F766E] bg-[#F0FDF4] text-[#0F766E]"
                     : "border-[#E2E8F0] bg-white hover:border-[#0F766E] hover:bg-[#F8FAFC]"
                     }`}>
@@ -391,7 +433,7 @@ export default function LoginPage() {
 
                 {/* Demo */}
                 <button type="button" disabled={loading} onClick={handleDemo}
-                  className="w-full p-4 rounded-xl border border-[#E2E8F0] bg-white hover:border-[#D97706] hover:bg-[#FFFBEB] transition-all flex items-center gap-4 group">
+                  className="w-full p-3 rounded-xl border border-[#E2E8F0] bg-white hover:border-[#D97706] hover:bg-[#FFFBEB] transition-all flex items-center gap-4 group">
                   <div className="w-10 h-10 rounded-lg bg-[#FEF3C7] text-[#D97706] flex items-center justify-center">
                     <Sparkles size={18} />
                   </div>
@@ -405,7 +447,7 @@ export default function LoginPage() {
           )}
 
           {/* Toggle */}
-          <p className="text-left text-sm text-[#64748B] font-medium mt-10">
+          <p className="text-left text-sm text-[#64748B] font-medium mt-6">
             {isRegistering ? "Already have an account? " : "Belum punya akun? "}
             <button
               onClick={() => { setReg(!isRegistering); setMagic(false); }}
