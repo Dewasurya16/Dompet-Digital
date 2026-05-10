@@ -14,7 +14,7 @@ import {
   TrendingUp, TrendingDown, BarChart3, PiggyBank, Check,
   Bell, Info, Zap, Home, LayoutGrid, Camera, Lightbulb, MapPin, Mail, Users
 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Swal from 'sweetalert2';
@@ -143,7 +143,7 @@ export default function DashboardPage() {
   const [useLocation, setUseLocation] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const [filterMode, setFilterMode] = useState('month');
+  const [filterMode, setFilterMode] = useState<'today'|'week'|'month'|'custom'>('month');
   const [filterMonth, setFilterMonth] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -609,7 +609,22 @@ export default function DashboardPage() {
 
   const filteredTransactions = useMemo(() => {
     let result = [...transactions];
-    if (filterMode === 'month') { if (filterMonth !== 'all') { result = result.filter(t => { const d = new Date(t.created_at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === filterMonth; }); } }
+    const now = new Date();
+    
+    if (filterMode === 'today') {
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      result = result.filter(t => t.created_at.startsWith(todayStr));
+    }
+    else if (filterMode === 'week') {
+      const startOfWeek = new Date(now);
+      const day = now.getDay() || 7;
+      if (day !== 1) startOfWeek.setHours(-24 * (day - 1));
+      startOfWeek.setHours(0, 0, 0, 0);
+      result = result.filter(t => new Date(t.created_at) >= startOfWeek);
+    }
+    else if (filterMode === 'month') { 
+      if (filterMonth !== 'all') { result = result.filter(t => { const d = new Date(t.created_at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === filterMonth; }); } 
+    }
     else if (filterMode === 'custom' && customStartDate && customEndDate) { const start = new Date(customStartDate); start.setHours(0, 0, 0, 0); const end = new Date(customEndDate); end.setHours(23, 59, 59, 999); result = result.filter(t => { const tDate = new Date(t.created_at); return tDate >= start && tDate <= end; }); }
     if (searchQuery) result = result.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || t.category.toLowerCase().includes(searchQuery.toLowerCase()) || (t.wallet && t.wallet.toLowerCase().includes(searchQuery.toLowerCase())));
     if (sortBy === 'newest') result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -618,6 +633,19 @@ export default function DashboardPage() {
     else if (sortBy === 'lowest') result.sort((a, b) => Number(a.amount) - Number(b.amount));
     return result;
   }, [transactions, filterMode, filterMonth, customStartDate, customEndDate, searchQuery, sortBy]);
+
+  const monthlyCashflowData = useMemo(() => {
+    const monthsMap: Record<string, { income: number; expense: number }> = {};
+    const sortedTx = [...transactions].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    sortedTx.forEach(t => {
+      const d = new Date(t.created_at);
+      const mStr = d.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' });
+      if (!monthsMap[mStr]) monthsMap[mStr] = { income: 0, expense: 0 };
+      if (t.type === 'pemasukan' && !['Investasi', 'Terima Pinjaman', 'Dibayar Hutang'].includes(t.category)) monthsMap[mStr].income += Number(t.amount);
+      if (t.type === 'pengeluaran' && !['Investasi', 'Beri Hutang', 'Bayar Pinjaman'].includes(t.category)) monthsMap[mStr].expense += Number(t.amount);
+    });
+    return Object.entries(monthsMap).map(([month, data]) => ({ month, Pemasukan: data.income, Pengeluaran: data.expense })).slice(-6);
+  }, [transactions]);
 
   const stats = useMemo(() => {
     const income = filteredTransactions.filter(t => t.type === 'pemasukan' && !['Investasi', 'Terima Pinjaman', 'Dibayar Hutang'].includes(t.category)).reduce((acc, curr) => acc + Number(curr.amount), 0);
@@ -1079,6 +1107,8 @@ export default function DashboardPage() {
           <div className="flex items-center gap-4">
             {/* Filters */}
             <div className="flex items-center bg-white dark:bg-[#0B3E3A] p-1.5 rounded-xl border-[3px] border-[#0B3E3A] dark:border-white shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF]">
+              <button onClick={() => setFilterMode('today')} className={`px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'today' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70 hover:opacity-100'}`}>Hari Ini</button>
+              <button onClick={() => setFilterMode('week')} className={`px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'week' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70 hover:opacity-100'}`}>Minggu Ini</button>
               <button onClick={() => setFilterMode('month')} className={`px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'month' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70 hover:opacity-100'}`}>Bulan</button>
               <button onClick={() => setFilterMode('custom')} className={`px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'custom' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70 hover:opacity-100'}`}>Rentang</button>
             </div>
@@ -1087,13 +1117,13 @@ export default function DashboardPage() {
                 <option value="all">Semua Waktu</option>
                 {availableMonths.map(m => <option key={m} value={m}>{parseMonthSafe(m).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}</option>)}
               </select>
-            ) : (
+            ) : filterMode === 'custom' ? (
               <div className="flex items-center bg-white dark:bg-[#0B3E3A] border-[3px] border-[#0B3E3A] dark:border-white px-4 py-2 rounded-xl gap-2 shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF]">
                 <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-transparent outline-none text-xs font-black w-[110px]" />
                 <span className="font-black">—</span>
                 <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-transparent outline-none text-xs font-black w-[110px]" />
               </div>
-            )}
+            ) : null}
             <button onClick={togglePrivacy} className="w-12 h-12 flex items-center justify-center bg-white dark:bg-[#0B3E3A] border-[3px] border-[#0B3E3A] dark:border-white rounded-xl shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
               {showBalance ? <Eye size={20} strokeWidth={2.5} /> : <EyeOff size={20} strokeWidth={2.5} />}
             </button>
@@ -1105,22 +1135,24 @@ export default function DashboardPage() {
 
           {/* Mobile Filter Row */}
           <div className="lg:hidden flex flex-wrap items-center gap-3 mb-6">
-            <div className="flex w-full items-center bg-white dark:bg-[#0B3E3A] p-1.5 rounded-xl border-[3px] border-[#0B3E3A] dark:border-white shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF]">
-              <button onClick={() => setFilterMode('month')} className={`flex-1 px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'month' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70'}`}>Bulan</button>
-              <button onClick={() => setFilterMode('custom')} className={`flex-1 px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'custom' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70'}`}>Rentang</button>
+            <div className="flex w-full items-center overflow-x-auto custom-scrollbar bg-white dark:bg-[#0B3E3A] p-1.5 rounded-xl border-[3px] border-[#0B3E3A] dark:border-white shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF]">
+              <button onClick={() => setFilterMode('today')} className={`shrink-0 px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'today' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70'}`}>Hari Ini</button>
+              <button onClick={() => setFilterMode('week')} className={`shrink-0 px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'week' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70'}`}>Minggu</button>
+              <button onClick={() => setFilterMode('month')} className={`shrink-0 px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'month' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70'}`}>Bulan</button>
+              <button onClick={() => setFilterMode('custom')} className={`shrink-0 px-4 py-2 text-xs font-black rounded-lg transition-all border-2 ${filterMode === 'custom' ? 'bg-[#FDE68A] border-[#0B3E3A] text-[#0B3E3A]' : 'border-transparent opacity-70'}`}>Rentang</button>
             </div>
             {filterMode === 'month' ? (
               <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full bg-white dark:bg-[#0B3E3A] px-4 py-3 rounded-xl border-[3px] border-[#0B3E3A] dark:border-white text-xs font-black outline-none shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF] cursor-pointer">
                 <option value="all">Semua Waktu</option>
                 {availableMonths.map(m => <option key={m} value={m}>{parseMonthSafe(m).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}</option>)}
               </select>
-            ) : (
+            ) : filterMode === 'custom' ? (
               <div className="flex w-full items-center justify-between bg-white dark:bg-[#0B3E3A] border-[3px] border-[#0B3E3A] dark:border-white px-4 py-2 rounded-xl gap-2 shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF]">
                 <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} className="bg-transparent outline-none text-xs font-black w-full" />
                 <span className="font-black px-2">—</span>
                 <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} className="bg-transparent outline-none text-xs font-black w-full" />
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* ── VIEW: DASHBOARD ── */}
@@ -1325,7 +1357,15 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="p-4 max-h-[600px] overflow-y-auto space-y-4 custom-scrollbar">
-                    {filteredTransactions.map((t) => {
+                    {filteredTransactions.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center p-12 bg-[#FDFBF7] dark:bg-[#062623] border-[4px] border-dashed border-[#0B3E3A] dark:border-white rounded-3xl shadow-[6px_6px_0_0_#0B3E3A] dark:shadow-[6px_6px_0_0_#FFFFFF]">
+                        <div className="w-20 h-20 bg-[#FDE68A] border-[4px] border-[#0B3E3A] rounded-full flex items-center justify-center mb-4 shadow-[4px_4px_0_0_#0B3E3A] animate-float">
+                          <span className="text-4xl">👻</span>
+                        </div>
+                        <p className="font-black text-lg text-center text-[#0B3E3A] dark:text-white uppercase mb-1">Wah, Kosong Melompong!</p>
+                        <p className="font-bold text-xs text-center text-[#0B3E3A]/70 dark:text-white/70 max-w-xs">Belum ada transaksi sama sekali nih. Yuk catat pengeluaran atau pemasukan pertamamu!</p>
+                      </div>
+                    ) : filteredTransactions.map((t) => {
                       const isIncome = t.type === 'pemasukan';
                       return (
                         <div key={t.id} className="flex flex-col sm:flex-row justify-between sm:items-center p-4 border-[3px] border-[#0B3E3A] dark:border-white rounded-xl bg-white dark:bg-[#0B3E3A] hover:translate-x-[2px] hover:translate-y-[2px] shadow-[3px_3px_0_0_#0B3E3A] dark:shadow-[3px_3px_0_0_#FFFFFF] hover:shadow-none transition-all gap-4">
@@ -1455,6 +1495,28 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Bar Chart - Cashflow Tahunan */}
+            <div className="bg-white dark:bg-[#0B3E3A] border-[4px] border-[#0B3E3A] dark:border-white p-6 rounded-2xl shadow-[6px_6px_0_0_#0B3E3A] dark:shadow-[6px_6px_0_0_#FFFFFF] mb-8">
+              <h3 className="font-black text-lg uppercase border-b-[3px] border-[#0B3E3A] dark:border-white pb-3 mb-6"><BarChart3 size={20} className="inline mr-2 text-[#8B5CF6]" strokeWidth={3} /> Perbandingan Arus Kas (6 Bulan)</h3>
+              <div className="h-64 w-full">
+                {monthlyCashflowData.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center opacity-50"><BarChart3 size={48} strokeWidth={2} /><p className="font-black mt-2">BELUM ADA DATA TRANSAKSI</p></div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyCashflowData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#CBD5E1" />
+                      <XAxis dataKey="month" tick={{ fill: '#0B3E3A', fontWeight: 900, fontSize: 12 }} axisLine={{ stroke: '#0B3E3A', strokeWidth: 3 }} tickLine={false} />
+                      <YAxis tickFormatter={(val) => `Rp${val / 1000000}M`} width={50} tick={{ fill: '#0B3E3A', fontWeight: 900, fontSize: 10 }} axisLine={{ stroke: '#0B3E3A', strokeWidth: 3 }} tickLine={false} />
+                      <Tooltip formatter={(value: any) => formatIDR(Number(value))} cursor={{ fill: 'rgba(16, 185, 129, 0.1)' }} contentStyle={{ backgroundColor: '#fff', border: '3px solid #0B3E3A', borderRadius: '12px', color: '#0B3E3A', fontSize: '12px', fontWeight: '900', boxShadow: '4px 4px 0 0 #0B3E3A' }} />
+                      <Legend wrapperStyle={{ paddingTop: '20px', fontWeight: 900, fontSize: '12px' }} />
+                      <Bar dataKey="Pemasukan" fill="#10B981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Pengeluaran" fill="#F43F5E" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
             {/* Budget Section */}
             <div className="bg-white dark:bg-[#0B3E3A] border-[4px] border-[#0B3E3A] dark:border-white p-6 rounded-2xl shadow-[6px_6px_0_0_#0B3E3A] dark:shadow-[6px_6px_0_0_#FFFFFF] mb-8">
               <div className="flex justify-between items-center mb-6 border-b-[3px] border-[#0B3E3A] dark:border-white pb-3">
@@ -1570,9 +1632,14 @@ export default function DashboardPage() {
                 <button onClick={() => setShowPocketModal(true)} className="bg-[#BAE6FD] text-[#0B3E3A] border-[3px] border-[#0B3E3A] px-4 py-2 rounded-xl font-black text-xs shadow-[3px_3px_0_0_#0B3E3A] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center gap-2 uppercase"><Plus size={16} strokeWidth={3} /> Buat</button>
               </div>
               {pockets.length === 0 ? (
-                <div className="p-10 border-[4px] border-dashed border-[#0B3E3A] dark:border-white rounded-2xl text-center opacity-60 font-black flex flex-col items-center gap-3">
-                  <PiggyBank size={48} strokeWidth={2} />
-                  BELUM ADA KANTONG
+                <div className="p-12 bg-[#FDFBF7] dark:bg-[#062623] border-[4px] border-dashed border-[#0B3E3A] dark:border-white rounded-3xl text-center flex flex-col items-center gap-4 shadow-[6px_6px_0_0_#0B3E3A] dark:shadow-[6px_6px_0_0_#FFFFFF]">
+                  <div className="w-20 h-20 bg-[#BAE6FD] border-[4px] border-[#0B3E3A] rounded-full flex items-center justify-center shadow-[4px_4px_0_0_#0B3E3A] animate-float-rev">
+                    <span className="text-4xl">🐷</span>
+                  </div>
+                  <div>
+                    <p className="font-black text-lg text-[#0B3E3A] dark:text-white uppercase">Celengan Masih Kosong</p>
+                    <p className="text-xs font-bold text-[#0B3E3A]/70 dark:text-white/70 mt-2">Bikin kantong buat target beli iPhone atau liburan ke Bali yuk!</p>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1614,9 +1681,14 @@ export default function DashboardPage() {
                 <button onClick={() => setShowInvestModal(true)} className="bg-[#A7F3D0] text-[#0B3E3A] border-[3px] border-[#0B3E3A] px-4 py-2 rounded-xl font-black text-xs shadow-[3px_3px_0_0_#0B3E3A] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all flex items-center gap-2 uppercase"><Plus size={16} strokeWidth={3} /> Tambah</button>
               </div>
               {investments.length === 0 ? (
-                <div className="p-10 border-[4px] border-dashed border-[#0B3E3A] dark:border-white rounded-2xl text-center opacity-60 font-black flex flex-col items-center gap-3">
-                  <Gem size={48} strokeWidth={2} />
-                  BELUM ADA ASET
+                <div className="p-12 bg-[#FDFBF7] dark:bg-[#062623] border-[4px] border-dashed border-[#0B3E3A] dark:border-white rounded-3xl text-center flex flex-col items-center gap-4 shadow-[6px_6px_0_0_#0B3E3A] dark:shadow-[6px_6px_0_0_#FFFFFF]">
+                  <div className="w-20 h-20 bg-[#A7F3D0] border-[4px] border-[#0B3E3A] rounded-full flex items-center justify-center shadow-[4px_4px_0_0_#0B3E3A] animate-float">
+                    <span className="text-4xl">📈</span>
+                  </div>
+                  <div>
+                    <p className="font-black text-lg text-[#0B3E3A] dark:text-white uppercase">Nol Aset Cuy</p>
+                    <p className="text-xs font-bold text-[#0B3E3A]/70 dark:text-white/70 mt-2">Mulai investasinya dikit-dikit, biar pas tua nggak pusing cicilan.</p>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
