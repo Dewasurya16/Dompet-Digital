@@ -745,11 +745,31 @@ export default function DashboardPage() {
     try {
       const resp = await fetch('/logo.png');
       const blob = await resp.blob();
-      const logoB64 = await new Promise<string>((resolve) => {
+      const rawB64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
       });
+      
+      // Kompres logo dengan Canvas agar PDF tidak bengkak (mencegah Payload Too Large saat kirim email)
+      const compressedB64 = await new Promise<string>((resolve) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 150; // Ukuran kecil yang cukup tajam untuk PDF (30x30 mm)
+          canvas.height = 150;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, 150, 150);
+            resolve(canvas.toDataURL('image/jpeg', 0.8)); // Gunakan JPEG terkompresi
+          } else {
+            resolve(rawB64);
+          }
+        };
+        img.onerror = () => resolve(rawB64);
+        img.src = rawB64;
+      });
+
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(165, 8, 34, 34, 4, 4, 'F');
       doc.setDrawColor(11, 62, 58);
@@ -759,7 +779,7 @@ export default function DashboardPage() {
       doc.setDrawColor(11, 62, 58);
       doc.setLineWidth(0.5);
       doc.roundedRect(167, 10, 34, 34, 4, 4, 'S');
-      doc.addImage(logoB64, 'PNG', 167, 10, 30, 30);
+      doc.addImage(compressedB64, 'JPEG', 167, 10, 30, 30, undefined, 'FAST');
     } catch { /* skip */ }
 
     // Judul

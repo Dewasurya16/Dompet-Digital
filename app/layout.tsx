@@ -11,18 +11,43 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Dompet Pintar — Manajemen Keuangan Cerdas",
+    default: "My Dompet Digital — Manajemen Keuangan Cerdas",
     template: "%s | Dompet Pintar",
   },
+
   description:
-    "Catat pengeluaran, kelola tabungan, dan pantau portofolio investasi dengan analitik AI. Platform manajemen keuangan #1 di Indonesia.",
-  keywords: ["keuangan", "tabungan", "investasi", "budgeting", "fintech", "indonesia"],
+    "Catat pengeluaran, kelola tabungan, dan pantau portofolio investasi dengan analitik AI.",
+
+  keywords: [
+    "keuangan",
+    "tabungan",
+    "investasi",
+    "budgeting",
+    "fintech",
+    "indonesia",
+  ],
+
   authors: [{ name: "Dompet Pintar" }],
+
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
+
   openGraph: {
     title: "Dompet Pintar — Manajemen Keuangan Cerdas",
     description: "Satu aplikasi, kendali penuh keuanganmu.",
     type: "website",
     locale: "id_ID",
+    images: [
+      {
+        url: "/logo.png",
+        width: 512,
+        height: 512,
+        alt: "Dompet Pintar Logo",
+      },
+    ],
   },
 };
 
@@ -32,27 +57,45 @@ export default function RootLayout({
   return (
     <html lang="id" className="h-full antialiased scroll-smooth">
       <head>
-        {/* Preconnect for Google Fonts */}
+        {/* FAVICON */}
+        <link rel="icon" href="/logo.png" sizes="any" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+
+        {/* GOOGLE FONTS */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+
         <link
           href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
       </head>
+
       <body
         className="min-h-full flex flex-col bg-[#F7F6F1] dark:bg-[#0C0C10] transition-colors duration-500"
-        style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
+        style={{
+          fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+        }}
       >
-        {/* Google Analytics */}
+        {/* GOOGLE ANALYTICS */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-ESQLR58N76"
           strategy="afterInteractive"
         />
+
         <Script id="google-analytics" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
+
+            function gtag(){
+              dataLayer.push(arguments);
+            }
+
             gtag('js', new Date());
             gtag('config', 'G-ESQLR58N76');
           `}
