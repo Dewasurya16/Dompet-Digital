@@ -15,28 +15,32 @@ const Toast = Swal.mixin({
 const showToast = (icon: "success" | "error" | "info" | "warning", title: string) =>
   Toast.fire({ icon, title });
 
-/* ── WALLET ILLUSTRATION ────────────────────────────────────── */
+/* ── ELEGANT WALLET ILLUSTRATION ────────────────────────────── */
 function WalletIllustration() {
   return (
     <svg viewBox="0 0 420 500" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full max-h-[420px]">
       <defs>
         <radialGradient id="wbody" cx="40%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="#10B981" />
-          <stop offset="100%" stopColor="#065F46" />
+          <stop offset="0%" stopColor="#146A64" />
+          <stop offset="100%" stopColor="#0B3E3A" />
         </radialGradient>
         <radialGradient id="cgold" cx="30%" cy="30%" r="70%">
           <stop offset="0%" stopColor="#FDE68A" />
-          <stop offset="100%" stopColor="#D97706" />
+          <stop offset="100%" stopColor="#B45309" />
         </radialGradient>
-        <radialGradient id="cgreen" cx="30%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="#6EE7B7" />
-          <stop offset="100%" stopColor="#059669" />
+        <radialGradient id="cbronze" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#FCA5A5" />
+          <stop offset="100%" stopColor="#991B1B" />
+        </radialGradient>
+        <radialGradient id="ccard" cx="20%" cy="20%" r="80%">
+          <stop offset="0%" stopColor="#0F766E" />
+          <stop offset="100%" stopColor="#042F2E" />
         </radialGradient>
         <style>{`
           @keyframes f1 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
           @keyframes f2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
           @keyframes f3 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
-          @keyframes ps  { 0%,100%{opacity:.3;r:5} 50%{opacity:1;r:7} }
+          @keyframes ps  { 0%,100%{opacity:.3;r:3} 50%{opacity:1;r:5} }
           .fl1{animation:f1 4s ease-in-out infinite}
           .fl2{animation:f2 5s ease-in-out .8s infinite}
           .fl3{animation:f3 3.5s ease-in-out .4s infinite}
@@ -44,95 +48,86 @@ function WalletIllustration() {
         `}</style>
       </defs>
 
-      {/* BG blobs */}
-      <circle cx="70" cy="430" r="130" fill="rgba(255,255,255,0.07)" />
-      <circle cx="360" cy="70" r="100" fill="rgba(255,255,255,0.05)" />
+      {/* Abstract Background Waves */}
+      <path d="M 0 350 Q 150 250 420 350 L 420 500 L 0 500 Z" fill="rgba(255,255,255,0.03)" />
+      <path d="M 0 400 Q 200 300 420 450 L 420 500 L 0 500 Z" fill="rgba(255,255,255,0.02)" />
 
-      {/* Stars */}
-      {[[340, 430, 6], [55, 210, 5], [390, 280, 4], [160, 80, 6]].map(([x, y, r], i) => (
-        <circle key={i} cx={x} cy={y} r={r} fill="rgba(255,255,255,0.55)"
+      {/* Subtle Stars/Sparks */}
+      {[[340, 430, 4], [55, 210, 3], [390, 200, 4], [160, 80, 5]].map(([x, y, r], i) => (
+        <circle key={i} cx={x} cy={y} r={r} fill="#FDE68A"
           style={{ animation: `ps ${2 + i * 0.5}s ease-in-out ${i * 0.4}s infinite` }} />
       ))}
 
-      {/* Gold coin */}
+      {/* Bronze Coin (Rp) */}
       <g className="fl3">
-        <circle cx="355" cy="360" r="32" fill="url(#cgold)" />
-        <circle cx="355" cy="360" r="24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" />
-        <text x="355" y="367" textAnchor="middle" fontSize="17" fontWeight="900" fill="#92400E">Rp</text>
+        <circle cx="80" cy="180" r="30" fill="url(#cbronze)" />
+        <circle cx="80" cy="180" r="23" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+        <text x="80" y="186" textAnchor="middle" fontSize="16" fontWeight="900" fill="#FEF2F2">Rp</text>
       </g>
 
-      {/* Small green coin */}
+      {/* Gold Coin ($) */}
       <g className="fl2">
-        <circle cx="62" cy="340" r="24" fill="url(#cgreen)" />
-        <text x="62" y="347" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#065F46">$</text>
+        <circle cx="280" cy="110" r="26" fill="url(#cgold)" />
+        <circle cx="280" cy="110" r="20" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+        <text x="280" y="116" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#78350F">$</text>
       </g>
 
-      {/* Tiny coin */}
+      {/* Mini Gold Coin (¥) */}
       <g className="fl4">
-        <circle cx="385" cy="160" r="18" fill="#FCD34D" />
-        <text x="385" y="166" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#92400E">¥</text>
+        <circle cx="160" cy="130" r="18" fill="url(#cgold)" />
+        <text x="160" y="135" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#78350F">¥</text>
       </g>
 
-      {/* Receipt card (rotated, floating) */}
-      <g className="fl4" style={{ transformOrigin: "340px 110px" }}>
-        <rect x="295" y="50" width="90" height="110" rx="10" fill="white" opacity="0.88" transform="rotate(14 340 110)" />
-        <rect x="306" y="68" width="68" height="5" rx="2.5" fill="#D1D5DB" transform="rotate(14 340 110)" />
-        <rect x="306" y="82" width="50" height="5" rx="2.5" fill="#E5E7EB" transform="rotate(14 340 110)" />
-        <rect x="306" y="96" width="60" height="5" rx="2.5" fill="#E5E7EB" transform="rotate(14 340 110)" />
-        <rect x="306" y="114" width="44" height="12" rx="4" fill="#059669" opacity="0.7" transform="rotate(14 340 110)" />
+      {/* Receipt Card */}
+      <g className="fl4" style={{ transformOrigin: "320px 280px" }}>
+        <rect x="270" y="220" width="100" height="130" rx="6" fill="#F8FAFC" opacity="0.95" />
+        <text x="320" y="245" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#0F4C46">Receipt</text>
+        <rect x="285" y="255" width="70" height="2" fill="#CBD5E1" />
+        <rect x="285" y="265" width="50" height="4" rx="2" fill="#94A3B8" />
+        <rect x="285" y="275" width="60" height="4" rx="2" fill="#94A3B8" />
+        <rect x="285" y="285" width="40" height="4" rx="2" fill="#94A3B8" />
+        <rect x="285" y="315" width="50" height="10" rx="3" fill="#0F4C46" opacity="0.8" />
       </g>
 
-      {/* Mini bar chart */}
+      {/* Bar Chart Element */}
       <g className="fl2">
-        <rect x="28" y="415" width="72" height="62" rx="10" fill="rgba(255,255,255,0.13)" />
-        {[18, 30, 22, 38].map((h, i) => (
-          <rect key={i} x={40 + i * 15} y={455 - h} width="9" rx="3" height={h} fill="rgba(255,255,255,0.55)" />
-        ))}
+        <rect x="40" y="290" width="100" height="90" rx="12" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+        <rect x="55" y="340" width="12" rx="3" height="25" fill="#6EE7B7" />
+        <rect x="75" y="320" width="12" rx="3" height="45" fill="#34D399" />
+        <rect x="95" y="300" width="12" rx="3" height="65" fill="#FDE68A" />
+        <rect x="115" y="330" width="12" rx="3" height="35" fill="#FCD34D" />
       </g>
 
-      {/* Shadow */}
-      <ellipse cx="210" cy="458" rx="90" ry="14" fill="rgba(0,0,0,0.13)" />
+      {/* Main Wallet Base */}
+      <ellipse cx="210" cy="360" rx="100" ry="15" fill="rgba(0,0,0,0.2)" />
 
-      {/* Main wallet body */}
       <g className="fl1">
-        {/* Body */}
-        <rect x="88" y="175" width="244" height="262" rx="34" fill="url(#wbody)" />
-        {/* Top flap */}
-        <rect x="88" y="175" width="244" height="90" rx="34" fill="#059669" />
-        <rect x="88" y="243" width="244" height="32" fill="#059669" />
-        {/* Clasp */}
-        <rect x="160" y="152" width="100" height="46" rx="16" fill="#34D399" />
-        <rect x="174" y="164" width="72" height="20" rx="10" fill="#065F46" />
-        {/* Card lines */}
-        <rect x="118" y="305" width="184" height="7" rx="3.5" fill="rgba(255,255,255,0.14)" />
-        <rect x="118" y="322" width="150" height="7" rx="3.5" fill="rgba(255,255,255,0.09)" />
-        <rect x="118" y="339" width="120" height="7" rx="3.5" fill="rgba(255,255,255,0.07)" />
-        {/* Eyes */}
-        <ellipse cx="173" cy="243" rx="20" ry="22" fill="white" />
-        <ellipse cx="247" cy="243" rx="20" ry="22" fill="white" />
-        <circle cx="176" cy="246" r="12" fill="#0C4A2D" />
-        <circle cx="250" cy="246" r="12" fill="#0C4A2D" />
-        <circle cx="180" cy="241" r="4.5" fill="white" />
-        <circle cx="254" cy="241" r="4.5" fill="white" />
-        {/* Eyelashes */}
-        <path d="M155 228 Q159 220 167 224" stroke="#0C4A2D" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-        <path d="M192 228 Q190 220 184 223" stroke="#0C4A2D" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-        <path d="M229 228 Q233 220 241 224" stroke="#0C4A2D" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-        <path d="M266 228 Q264 220 258 223" stroke="#0C4A2D" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-        {/* Blush */}
-        <ellipse cx="145" cy="268" rx="16" ry="10" fill="rgba(255,80,80,0.22)" />
-        <ellipse cx="275" cy="268" rx="16" ry="10" fill="rgba(255,80,80,0.22)" />
-        {/* Smile */}
-        <path d="M176 288 Q210 316 244 288" stroke="white" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-        {/* Hands */}
-        <ellipse cx="88" cy="320" rx="24" ry="20" fill="#34D399" />
-        <ellipse cx="332" cy="320" rx="24" ry="20" fill="#34D399" />
-        <ellipse cx="72" cy="304" rx="9" ry="13" fill="#34D399" />
-        <ellipse cx="85" cy="298" rx="9" ry="13" fill="#34D399" />
-        <ellipse cx="100" cy="298" rx="9" ry="13" fill="#34D399" />
-        <ellipse cx="316" cy="304" rx="9" ry="13" fill="#34D399" />
-        <ellipse cx="329" cy="298" rx="9" ry="13" fill="#34D399" />
-        <ellipse cx="344" cy="298" rx="9" ry="13" fill="#34D399" />
+        {/* Wallet Back */}
+        <rect x="110" y="180" width="200" height="140" rx="16" fill="#063430" />
+        {/* Cash inside */}
+        <rect x="125" y="165" width="170" height="40" rx="6" fill="#6EE7B7" transform="rotate(-5 210 180)" />
+        <rect x="120" y="170" width="180" height="40" rx="6" fill="#34D399" />
+
+        {/* Wallet Front */}
+        <rect x="110" y="195" width="200" height="125" rx="16" fill="url(#wbody)" stroke="rgba(255,255,255,0.1)" strokeWidth="2" />
+
+        {/* Wallet Flap */}
+        <path d="M 110 195 Q 210 240 310 195 L 310 260 Q 210 290 110 260 Z" fill="#115E59" />
+
+        {/* Gold Clasp */}
+        <circle cx="210" cy="245" r="10" fill="#FDE68A" />
+        <circle cx="210" cy="245" r="6" fill="#D97706" />
+      </g>
+
+      {/* Floating Emerald Card */}
+      <g className="fl3">
+        <rect x="220" y="340" width="120" height="75" rx="8" fill="url(#ccard)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+        <text x="235" y="360" fontSize="10" fontWeight="bold" fill="#F1F5F9" letterSpacing="1">Emerald Card</text>
+        {/* Chip */}
+        <rect x="235" y="375" width="16" height="12" rx="2" fill="#FDE68A" />
+        {/* Master Card Logo Fake */}
+        <circle cx="310" cy="395" r="8" fill="#94A3B8" opacity="0.6" />
+        <circle cx="320" cy="395" r="8" fill="#CBD5E1" opacity="0.6" />
       </g>
     </svg>
   );
@@ -149,17 +144,17 @@ function FormInput({
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
-        <label className="text-[13px] font-semibold text-slate-700">{label}</label>
+        <label className="text-[13px] font-semibold text-[#0B3E3A]">{label}</label>
         {hint}
       </div>
-      <div className="flex items-center rounded-2xl border border-slate-200 bg-white overflow-hidden transition-all focus-within:border-emerald-500 focus-within:shadow-[0_0_0_4px_rgba(5,150,105,0.08)]">
-        <span className="pl-4 pr-3 text-slate-400 flex-shrink-0">{icon}</span>
-        <div className="w-px h-5 bg-slate-200 flex-shrink-0" />
+      <div className="flex items-center rounded-xl border border-[#CBD5E1] bg-white overflow-hidden transition-all focus-within:border-[#0F766E] focus-within:shadow-[0_0_0_3px_rgba(15,118,110,0.1)]">
+        <span className="pl-4 pr-3 text-[#94A3B8] flex-shrink-0">{icon}</span>
+        <div className="w-px h-5 bg-[#E2E8F0] flex-shrink-0" />
         <input
           required type={type} placeholder={placeholder}
           value={value} onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          className="flex-1 px-4 py-3.5 text-sm font-medium text-slate-800 placeholder:text-slate-300 outline-none bg-transparent disabled:opacity-50"
+          className="flex-1 px-4 py-3.5 text-sm font-medium text-[#0B3E3A] placeholder:text-[#94A3B8] outline-none bg-transparent disabled:opacity-50"
         />
         {right}
       </div>
@@ -202,8 +197,8 @@ export default function LoginPage() {
       } else {
         await Swal.fire({
           icon: "success", title: "✨ Magic Link Terkirim!",
-          html: `<p style="color:#64748B">Cek inbox kamu di <strong style="color:#059669">${email}</strong></p>`,
-          confirmButtonColor: "#059669", confirmButtonText: "Cek Email",
+          html: `<p style="color:#475569">Cek inbox kamu di <strong style="color:#0F766E">${email}</strong></p>`,
+          confirmButtonColor: "#0F766E", confirmButtonText: "Cek Email",
         });
         setMagic(false);
       }
@@ -216,8 +211,8 @@ export default function LoginPage() {
       if (error) { showToast("error", error.message); return; }
       await Swal.fire({
         icon: "success", title: "🎉 Akun Berhasil Dibuat!",
-        html: `<p style="color:#64748B">Silakan masuk dengan akun baru kamu.</p>`,
-        confirmButtonColor: "#059669", confirmButtonText: "Masuk Sekarang",
+        html: `<p style="color:#475569">Silakan masuk dengan akun baru kamu.</p>`,
+        confirmButtonColor: "#0F766E", confirmButtonText: "Masuk Sekarang",
       });
       fetch("/api/send-notification", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -233,8 +228,8 @@ export default function LoginPage() {
       await Swal.fire({
         icon: "error", title: "Login Gagal",
         text: "Email atau password salah.",
-        confirmButtonColor: "#059669",
-        footer: `<a href="#" style="color:#059669">Lupa password?</a>`,
+        confirmButtonColor: "#0F766E",
+        footer: `<a href="#" style="color:#0F766E">Lupa password?</a>`,
       });
     } else {
       showToast("success", "Selamat datang kembali! 👋");
@@ -245,7 +240,7 @@ export default function LoginPage() {
     const r = await Swal.fire({
       icon: "info", title: "Masuk sebagai Demo?",
       text: "Gunakan akun demo dengan data contoh.",
-      showCancelButton: true, confirmButtonColor: "#059669",
+      showCancelButton: true, confirmButtonColor: "#0F766E",
       cancelButtonColor: "#94A3B8", confirmButtonText: "Ya, Masuk Demo",
     });
     if (!r.isConfirmed) return;
@@ -257,100 +252,100 @@ export default function LoginPage() {
 
   return (
     <div
-      className="min-h-screen bg-[#E8F3EE] flex items-center justify-center p-4 sm:p-8"
+      className="min-h-screen bg-[#F0EEE4] flex items-center justify-center p-4 sm:p-8"
       style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
     >
       {/* ── CARD ───────────────────────────────────────────────── */}
-      <div className="w-full max-w-[940px] bg-white rounded-[36px] shadow-2xl shadow-emerald-900/10 overflow-hidden flex relative" style={{ minHeight: 600 }}>
+      <div className="w-full max-w-[980px] bg-[#FBF9F1] rounded-[24px] shadow-2xl shadow-[#0B3E3A]/10 overflow-hidden flex relative border border-[#E5E0D8]" style={{ minHeight: 640 }}>
 
         {/* ── LEFT PANEL ──────────────────────────────────────── */}
-        <div className="hidden lg:flex lg:w-[45%] flex-col relative overflow-hidden bg-gradient-to-b from-emerald-400 to-teal-600">
-          {/* Decorative circles */}
-          <div className="absolute -top-20 -left-20 w-72 h-72 rounded-full bg-white/10" />
-          <div className="absolute -bottom-16 -right-16 w-60 h-60 rounded-full bg-teal-700/25" />
-          <div className="absolute top-1/2 -right-10 w-40 h-40 rounded-full bg-emerald-300/20" />
+        <div className="hidden lg:flex lg:w-[45%] flex-col relative overflow-hidden bg-gradient-to-br from-[#0F4C46] to-[#062623]">
+
+          {/* Decorative glow */}
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-[#147067]/40 via-transparent to-transparent pointer-events-none" />
 
           {/* Logo */}
-          <div className="relative z-10 p-9">
-            <span className="text-2xl font-black text-white tracking-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
-              Dompet<span className="opacity-50">.</span>
+          <div className="relative z-10 p-10 pb-0">
+            <span className="text-3xl font-black text-white tracking-tight" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+              Dompet<span className="text-[#FDE68A]">.</span>
             </span>
           </div>
 
           {/* Illustration */}
-          <div className="flex-1 flex items-center justify-center px-8 relative z-10">
+          <div className="flex-1 flex items-center justify-center px-6 relative z-10">
             <WalletIllustration />
           </div>
 
           {/* Tagline */}
-          <div className="relative z-10 p-9 pt-0">
-            <p className="text-white/80 text-sm font-medium leading-relaxed">
-              Digunakan oleh <span className="text-white font-bold">10.000+</span> pengguna aktif
-              untuk mencapai kebebasan finansial. 🚀
+          <div className="relative z-10 p-10 pt-0">
+            <p className="text-white/80 text-sm font-medium leading-relaxed max-w-xs">
+              Akses dasbor keuangan pribadi Anda dan pantau pertumbuhan kekayaan Anda dengan elegan.
             </p>
           </div>
         </div>
 
         {/* ── RIGHT PANEL ─────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col justify-center px-8 sm:px-14 py-12 relative">
+        <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 py-12 relative">
 
           {/* Close button */}
           <Link
             href="/"
-            className="absolute top-6 right-6 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all"
+            className="absolute top-8 right-8 w-10 h-10 rounded-full bg-white border border-[#E2E8F0] hover:border-[#CBD5E1] flex items-center justify-center text-[#64748B] hover:text-[#0F766E] transition-all shadow-sm"
           >
-            <X size={16} />
+            <X size={18} />
           </Link>
 
           {/* Mobile logo */}
           <div className="lg:hidden mb-8">
-            <span className="text-2xl font-black text-slate-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
-              Dompet<span className="text-emerald-500">.</span>
+            <span className="text-3xl font-black text-[#0B3E3A]" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+              Dompet<span className="text-[#0F766E]">.</span>
             </span>
           </div>
 
           {/* Title */}
-          <h1
-            className="text-4xl font-black text-slate-900 mb-1"
-            style={{ fontFamily: "'Fraunces', Georgia, serif" }}
-          >
-            {isRegistering ? "Daftar" : useMagicLink ? "Magic Link ✨" : "Login"}
-          </h1>
-          <p className="text-sm text-slate-400 font-medium mb-8">
-            {isRegistering
-              ? "Buat akun gratis dan mulai kelola keuanganmu."
-              : useMagicLink
-                ? "Masukkan email, kami kirim link ajaib tanpa password."
-                : "Masuk ke dashboard kamu dan pantau keuanganmu."}
-          </p>
+          <div className="mb-10">
+            <h1
+              className="text-4xl sm:text-[42px] font-black text-[#0B3E3A] mb-3 leading-tight"
+              style={{ fontFamily: "'Fraunces', Georgia, serif" }}
+            >
+              {isRegistering ? "Create Account" : useMagicLink ? "Magic Link" : "Welcome to Dompet."}
+            </h1>
+            <p className="text-sm text-[#64748B] font-medium">
+              {isRegistering
+                ? "Daftar sekarang untuk memulai perjalanan finansial Anda."
+                : useMagicLink
+                  ? "Masukkan email, kami kirimkan akses instan tanpa kata sandi."
+                  : "Log in to your account untuk melanjutkan."}
+            </p>
+          </div>
 
           {/* Form */}
-          <form onSubmit={handleAuth} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-5">
             <FormInput
-              label="Email"
-              icon={<Mail size={16} />}
-              type="email" placeholder="contoh@email.com"
+              label="Email Address"
+              icon={<Mail size={18} />}
+              type="email" placeholder="Enter your email"
               value={email} onChange={setEmail} disabled={loading}
             />
 
             {!useMagicLink && (
               <FormInput
                 label="Password"
-                icon={<Lock size={16} />}
+                icon={<Lock size={18} />}
                 type={showPass ? "text" : "password"}
-                placeholder="Minimal 6 karakter"
+                placeholder="Kata Sandi"
                 value={password} onChange={setPassword} disabled={loading}
                 hint={
                   !isRegistering && (
-                    <a href="#" className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
+                    <a href="#" className="text-xs font-semibold text-[#0F766E] hover:text-[#0B3E3A] transition-colors">
                       Forgot Password?
                     </a>
                   )
                 }
                 right={
                   <button type="button" tabIndex={-1} onClick={() => setShowPass(!showPass)}
-                    className="pr-4 text-slate-300 hover:text-slate-500 transition-colors">
-                    {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+                    className="pr-4 text-[#94A3B8] hover:text-[#0F766E] transition-colors">
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 }
               />
@@ -359,12 +354,12 @@ export default function LoginPage() {
             {/* Submit */}
             <button
               type="submit" disabled={loading}
-              className="w-full py-4 mt-1 rounded-2xl bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white font-bold text-sm transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full py-4 mt-2 rounded-xl bg-[#0B3E3A] hover:bg-[#072926] active:scale-[0.98] text-white font-bold text-sm transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading
                 ? <Loader2 size={18} className="animate-spin" />
-                : isRegistering ? "Buat Akun 🚀"
-                  : useMagicLink ? "Kirim Magic Link"
+                : isRegistering ? "Create Account"
+                  : useMagicLink ? "Send Magic Link"
                     : "Log In"}
             </button>
           </form>
@@ -372,40 +367,53 @@ export default function LoginPage() {
           {/* Alt options */}
           {!isRegistering && (
             <>
-              <div className="flex items-center gap-3 my-6">
-                <div className="flex-1 h-px bg-slate-100" />
-                <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">Atau Lanjutkan Dengan</span>
-                <div className="flex-1 h-px bg-slate-100" />
+              <div className="flex items-center gap-4 my-8">
+                <div className="flex-1 h-px bg-[#E2E8F0]" />
+                <span className="text-[11px] uppercase tracking-widest text-[#94A3B8] font-bold">Or Continue With</span>
+                <div className="flex-1 h-px bg-[#E2E8F0]" />
               </div>
 
-              <div className="flex items-center justify-center gap-4">
+              <div className="space-y-3">
                 {/* Magic Link */}
                 <button type="button" disabled={loading} onClick={() => setMagic(!useMagicLink)}
-                  className={`w-14 h-14 rounded-2xl border transition-all shadow-sm flex items-center justify-center group ${useMagicLink
-                    ? "border-sky-400 bg-sky-50 text-sky-500"
-                    : "border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50 text-slate-400 hover:text-sky-500"
+                  className={`w-full p-4 rounded-xl border transition-all flex items-center gap-4 group ${useMagicLink
+                    ? "border-[#0F766E] bg-[#F0FDF4] text-[#0F766E]"
+                    : "border-[#E2E8F0] bg-white hover:border-[#0F766E] hover:bg-[#F8FAFC]"
                     }`}>
-                  <Zap size={20} className="group-hover:scale-110 transition-transform" />
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${useMagicLink ? 'bg-[#0F766E] text-white' : 'bg-[#F1F5F9] text-[#0F766E]'}`}>
+                    <Zap size={18} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-[#0B3E3A]">Magic Link Zap</p>
+                    <p className="text-xs text-[#64748B] font-medium">Enter email, we'll send a passwordless magic link.</p>
+                  </div>
                 </button>
 
                 {/* Demo */}
                 <button type="button" disabled={loading} onClick={handleDemo}
-                  className="w-14 h-14 rounded-2xl border border-slate-200 bg-white hover:border-amber-300 hover:bg-amber-50 text-slate-400 hover:text-amber-500 transition-all shadow-sm flex items-center justify-center group">
-                  <Sparkles size={20} className="group-hover:scale-110 transition-transform" />
+                  className="w-full p-4 rounded-xl border border-[#E2E8F0] bg-white hover:border-[#D97706] hover:bg-[#FFFBEB] transition-all flex items-center gap-4 group">
+                  <div className="w-10 h-10 rounded-lg bg-[#FEF3C7] text-[#D97706] flex items-center justify-center">
+                    <Sparkles size={18} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-[#0B3E3A]">Demo Sparkles</p>
+                    <p className="text-xs text-[#64748B] font-medium">Use demo account with example data.</p>
+                  </div>
                 </button>
               </div>
             </>
           )}
 
           {/* Toggle */}
-          <p className="text-center text-sm text-slate-400 font-medium mt-8">
-            {isRegistering ? "Sudah punya akun? " : "Belum punya akun? "}
+          <p className="text-left text-sm text-[#64748B] font-medium mt-10">
+            {isRegistering ? "Already have an account? " : "Belum punya akun? "}
             <button
               onClick={() => { setReg(!isRegistering); setMagic(false); }}
-              className="font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+              className="font-bold text-[#0F766E] hover:text-[#0B3E3A] transition-colors underline decoration-[#0F766E]/30 underline-offset-4"
             >
-              {isRegistering ? "Login di sini" : "Sign Up here"}
+              {isRegistering ? "Log In here" : "Daftar di sini"}
             </button>
+            {!isRegistering && ". Akses demo untuk mencoba fitur kami."}
           </p>
         </div>
       </div>
