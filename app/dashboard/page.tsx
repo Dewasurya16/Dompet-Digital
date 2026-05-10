@@ -369,11 +369,15 @@ export default function DashboardPage() {
     return { title: 'Pemula', icon: '🌱' };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!formData.title || !formData.amount) return;
     setIsSubmitting(true);
     let lat = formData.latitude, lng = formData.longitude;
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 9a6c17f4c90e52860e79e1a86cee2f5c010d72f5
     if (useLocation && !lat && !lng) {
       try {
         const pos = await new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { timeout: 5000 }));
@@ -393,7 +397,11 @@ export default function DashboardPage() {
       // 🚀 PROSES SIMPAN TRANSAKSI BARU
       const { data, error } = await supabase.from('transactions').insert([payload]).select().single();
       setIsSubmitting(false);
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> 9a6c17f4c90e52860e79e1a86cee2f5c010d72f5
       if (!error && data) {
         if (session?.user?.email) {
           // ✉️ TRIGGER 1: KIRIM EMAIL STRUK
@@ -419,7 +427,11 @@ export default function DashboardPage() {
             const limit = Number(catBudgets[payload.category]);
             // Hitung total pengeluaran + transaksi baru
             const spentSoFar = filteredTransactions.filter((t: any) => t.type === 'pengeluaran' && t.category === payload.category).reduce((acc: any, curr: any) => acc + Number(curr.amount), 0) + payload.amount;
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 9a6c17f4c90e52860e79e1a86cee2f5c010d72f5
             // Jika lewat 90% dari budget, kirim email alert
             if (spentSoFar >= limit * 0.9 && limit > 0) {
               fetch('/api/send-notification', {
@@ -444,11 +456,19 @@ export default function DashboardPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 email: session.user.email,
+<<<<<<< HEAD
                 type: 'anomaly_alert',
                 data: {
                   amount: payload.amount,
                   category: 'SALDO MINUS',
                   description: `Awas! Pengeluaran ini membuat saldo ${payload.wallet} kamu jadi minus/berdarah (Defisit). Segera cek keuanganmu!`
+=======
+                type: 'anomaly_alert', 
+                data: { 
+                  amount: payload.amount, 
+                  category: 'SALDO MINUS', 
+                  description: `Awas! Pengeluaran ini membuat saldo ${payload.wallet} kamu jadi minus/berdarah (Defisit). Segera cek keuanganmu!` 
+>>>>>>> 9a6c17f4c90e52860e79e1a86cee2f5c010d72f5
                 }
               })
             }).catch(console.error);
@@ -457,7 +477,11 @@ export default function DashboardPage() {
           // 🏆 TRIGGER 4: TARGET IMPIAN UTAMA TERCAPAI
           const currentNetWorth = stats.globalNetWorth;
           const target = Number(targetSaving);
+<<<<<<< HEAD
 
+=======
+          
+>>>>>>> 9a6c17f4c90e52860e79e1a86cee2f5c010d72f5
           if (currentNetWorth < target && (currentNetWorth + payload.amount) >= target && payload.type === 'pemasukan') {
             fetch('/api/send-notification', {
               method: 'POST',
@@ -465,9 +489,15 @@ export default function DashboardPage() {
               body: JSON.stringify({
                 email: session.user.email,
                 type: 'goal_reached',
+<<<<<<< HEAD
                 data: {
                   pocketName: 'Target Kekayaan Impian',
                   targetAmount: target
+=======
+                data: { 
+                  pocketName: 'Target Kekayaan Impian', 
+                  targetAmount: target 
+>>>>>>> 9a6c17f4c90e52860e79e1a86cee2f5c010d72f5
                 }
               })
             }).catch(console.error);
@@ -512,6 +542,7 @@ export default function DashboardPage() {
     if (!error) { fetchData(); showToast(`Tagihan ${t.title} berhasil dicatat!`, 'success'); } else { showToast('Gagal mencatat: ' + error.message, 'error'); }
   };
 
+<<<<<<< HEAD
   const handleSavePocket = async () => {
     if (!pocketForm.name || !pocketForm.target_amount) return;
     setIsSavingPocket(true);
@@ -552,7 +583,49 @@ export default function DashboardPage() {
 
       setShowPocketModal(false); fetchData(); showToast('Kantong disimpan!', 'success');
     }
+=======
+ const handleSavePocket = async () => {
+  if (!pocketForm.name || !pocketForm.target_amount) return;
+  setIsSavingPocket(true);
+  
+  const targetAmount = Number(pocketForm.target_amount);
+  const currentBalance = Number(pocketForm.balance || 0);
+
+  const payload = { 
+    name: pocketForm.name, 
+    icon: pocketForm.icon, 
+    target_amount: targetAmount, 
+    balance: currentBalance, 
+    user_id: session?.user?.id 
+>>>>>>> 9a6c17f4c90e52860e79e1a86cee2f5c010d72f5
   };
+
+  const { error } = editingPocketId 
+    ? await supabase.from('pockets').update(payload).eq('id', editingPocketId)
+    : await supabase.from('pockets').insert([payload]);
+
+  setIsSavingPocket(false);
+
+  if (!error) {
+    // 🏆 CEK APAKAH TARGET KANTONG TERCAPAI
+    if (currentBalance >= targetAmount) {
+      fetch('/api/send-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: session.user.email,
+          type: 'goal_reached',
+          data: { 
+            pocketName: pocketForm.name, 
+            targetAmount: targetAmount 
+          }
+        })
+      }).catch(console.error);
+    }
+    
+    setShowPocketModal(false); fetchData(); showToast('Kantong disimpan!', 'success');
+  }
+};
 
   const handleEditPocket = (pocket: any) => { setEditingPocketId(pocket.id); setPocketForm({ name: pocket.name, icon: pocket.icon || '🎯', target_amount: pocket.target_amount.toString(), balance: pocket.balance.toString() }); setShowPocketModal(true); };
   const handleDeletePocket = async (id: string) => {
@@ -795,14 +868,20 @@ export default function DashboardPage() {
     // Info Samping
     doc.setFontSize(10);
     doc.setTextColor(11, 62, 58);
-    doc.text('Pemasukan :', 110, summaryY + 14);
-    doc.text('Pengeluaran :', 110, summaryY + 22);
-    doc.text('Aset / Invest :', 110, summaryY + 30);
+    doc.text('Pemasukan', 110, summaryY + 14);
+    doc.text('Pengeluaran', 110, summaryY + 22);
+    doc.text('Aset / Investasi', 110, summaryY + 30);
     
-    doc.setFont('helvetica', 'normal');
-    doc.text(formatIDR(stats.income), 140, summaryY + 14);
-    doc.text(formatIDR(stats.expense), 140, summaryY + 22);
-    doc.text(formatIDR(stats.totalAssets), 140, summaryY + 30);
+    // Titik dua
+    doc.text(':', 138, summaryY + 14);
+    doc.text(':', 138, summaryY + 22);
+    doc.text(':', 138, summaryY + 30);
+    
+    // Angka rata kanan
+    doc.setFont('helvetica', 'bold');
+    doc.text(formatIDR(stats.income), 185, summaryY + 14, { align: 'right' });
+    doc.text(formatIDR(stats.expense), 185, summaryY + 22, { align: 'right' });
+    doc.text(formatIDR(stats.totalAssets), 185, summaryY + 30, { align: 'right' });
 
     // ── TABEL TRANSAKSI ───────────────────────────
     autoTable(doc, {
