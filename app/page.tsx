@@ -177,7 +177,7 @@ export default function LandingPage() {
             {/* Cute Sticker Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#E0F2FE] comic-border comic-shadow-sm mb-8 anim-tilt rotate-3 cursor-default hover:rotate-6 transition-transform">
               <Sparkles size={16} className="text-[#0EA5E9]" />
-              <span className="text-xs font-black text-[#0B3E3A] uppercase tracking-wider">Aplikasi Ter-Hype 2024!</span>
+              <span className="text-xs font-black text-[#0B3E3A] uppercase tracking-wider">Aplikasi Untuk kamu para Sultan Muda!</span>
             </div>
 
             <h1 className="text-5xl sm:text-6xl lg:text-[76px] leading-[1.05] font-black tracking-tight text-[#0B3E3A] mb-6 relative">
@@ -391,7 +391,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-sm font-black text-[#0B3E3A]/60">
-            © {new Date().getFullYear()} Dompet. Dibuat asyik 🇮🇩
+            © {new Date().getFullYear()} Dompet. Dibuat asyik dari Dewa Sinar Surya,S.Kom.
           </p>
         </div>
       </footer>

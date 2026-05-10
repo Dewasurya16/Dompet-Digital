@@ -670,7 +670,7 @@ export default function DashboardPage() {
 
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-[#FDFBF7] dark:bg-[#062623] flex flex-col items-center justify-center transition-colors duration-300 font-sans">
+      <div className="min-h-screen text-[95%] bg-[#FDFBF7] dark:bg-[#062623] flex flex-col items-center justify-center transition-colors duration-300 font-sans">
         <div className="w-24 h-24 rounded-2xl bg-[#FDE68A] border-[4px] border-[#0B3E3A] flex items-center justify-center shadow-[8px_8px_0_0_#0B3E3A] animate-bounce mb-6">
           <Wallet size={40} className="text-[#0B3E3A]" />
         </div>
@@ -690,7 +690,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] dark:bg-[#062623] text-[#0B3E3A] dark:text-white font-sans antialiased transition-colors duration-500">
+    <div className="min-h-screen text-[95%] bg-[#FDFBF7] dark:bg-[#062623] text-[#0B3E3A] dark:text-white font-sans antialiased transition-colors duration-500">
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <ConfirmDialog open={!!confirmState} title={confirmState?.title || ''} message={confirmState?.message || ''} danger={confirmState?.danger} onConfirm={() => handleConfirmResult(true)} onCancel={() => handleConfirmResult(false)} />
@@ -764,8 +764,17 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Tombol Tema */}
+              <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-[#0B3E3A] border-[3px] border-[#0B3E3A] dark:border-white rounded-xl shadow-[3px_3px_0_0_#0B3E3A] dark:shadow-[3px_3px_0_0_#FFFFFF] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
+                {isDarkMode ? <Sun size={18} strokeWidth={2.5} className="text-[#FDE68A]" /> : <Moon size={18} strokeWidth={2.5} className="text-[#0B3E3A] dark:text-white" />}
+              </button>
+              {/* Tombol Privasi */}
               <button onClick={togglePrivacy} className="w-10 h-10 flex items-center justify-center bg-white dark:bg-[#0B3E3A] border-[3px] border-[#0B3E3A] dark:border-white rounded-xl shadow-[3px_3px_0_0_#0B3E3A] dark:shadow-[3px_3px_0_0_#FFFFFF] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
                 {showBalance ? <Eye size={18} strokeWidth={2.5} /> : <EyeOff size={18} strokeWidth={2.5} />}
+              </button>
+              {/* Tombol Pengaturan */}
+              <button onClick={() => setIsEditingSettings(true)} className="w-10 h-10 flex items-center justify-center bg-[#BAE6FD] dark:bg-[#064E3B] border-[3px] border-[#0B3E3A] dark:border-white rounded-xl shadow-[3px_3px_0_0_#0B3E3A] dark:shadow-[3px_3px_0_0_#FFFFFF] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
+                <Settings size={18} strokeWidth={2.5} className="text-[#0B3E3A] dark:text-white" />
               </button>
             </div>
           </div>
@@ -773,7 +782,7 @@ export default function DashboardPage() {
 
         {/* Desktop Top Bar (COMIC STYLE) */}
         <header className="hidden lg:flex items-center justify-between px-8 py-6 border-b-[4px] border-[#0B3E3A] dark:border-white bg-[#FDFBF7] dark:bg-[#062623] sticky top-0 z-40">
-          <h1 className="text-3xl font-black tracking-tight uppercase" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
+          <h1 className="text-2xl font-black tracking-tight uppercase" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>
             {activeView === 'dashboard' ? 'Overview' : activeView === 'transactions' ? 'Transaksi' : activeView === 'analytics' ? 'Analitik' : activeView === 'wallets' ? 'Dompet' : activeView === 'bills' ? 'Tagihan' : 'Pengaturan'}
           </h1>
           <div className="flex items-center gap-4">
@@ -801,7 +810,7 @@ export default function DashboardPage() {
         </header>
 
         {/* ═══ CONTENT AREA ═══ */}
-        <div className="p-5 sm:p-8">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
 
           {/* Mobile Filter Row */}
           <div className="lg:hidden flex flex-wrap items-center gap-3 mb-6">
@@ -983,6 +992,17 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <SelectInput label="Kategori" value={formData.category} onChange={(v: string) => setFormData({ ...formData, category: v })} options={formData.type === 'pengeluaran' ? ['Makanan', 'Transportasi', 'Tagihan', 'Belanja', 'Hiburan', 'Investasi', 'Beri Hutang', 'Bayar Pinjaman', 'Lainnya'] : ['Gaji Pokok', 'Bonus', 'Investasi', 'Terima Pinjaman', 'Dibayar Hutang', 'Lainnya']} />
                       <SelectInput label="Sumber Dana" value={formData.wallet} onChange={(v: string) => setFormData({ ...formData, wallet: v })} options={WALLET_OPTIONS} />
+                    </div>
+
+                    {/* ── TOMBOL GPS ── */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mt-4 mb-2">
+                      <button type="button" onClick={() => setUseLocation(!useLocation)} className={`flex items-center gap-2 px-4 py-2 rounded-xl border-[3px] border-[#0B3E3A] dark:border-white font-black text-xs transition-all shadow-[2px_2px_0_0_#0B3E3A] dark:shadow-[2px_2px_0_0_#FFFFFF] active:shadow-none active:translate-x-[2px] active:translate-y-[2px] ${useLocation ? 'bg-[#10B981] text-white' : 'bg-white dark:bg-[#1A1A1A] text-[#0B3E3A] dark:text-white'}`}>
+                        <MapPin size={16} strokeWidth={3} />
+                        {useLocation ? 'LOKASI AKTIF ✅' : 'CATAT LOKASI GPS'}
+                      </button>
+                      <p className="text-[10px] font-bold opacity-60 italic text-[#0B3E3A] dark:text-white">
+                        *Pastikan izin lokasi browser aktif
+                      </p>
                     </div>
 
                     <div className="flex gap-4 pt-4 border-t-[3px] border-[#0B3E3A] dark:border-white">
@@ -1535,9 +1555,13 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t-[4px] border-[#0B3E3A] dark:border-white bg-white dark:bg-[#1A1A1A]">
+            <div className="p-6 border-t-[4px] border-[#0B3E3A] dark:border-white bg-white dark:bg-[#1A1A1A] flex flex-col gap-3">
               <button onClick={saveSettings} className="w-full bg-[#10B981] text-white font-black py-4 rounded-xl border-[4px] border-[#0B3E3A] dark:border-white shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0B3E3A] active:shadow-none transition-all uppercase flex justify-center items-center gap-2 text-lg">
                 <Check size={24} strokeWidth={3} /> SIMPAN PENGATURAN
+              </button>
+              {/* Tombol Logout khusus tampil di Mobile */}
+              <button onClick={handleLogout} className="lg:hidden w-full bg-[#F43F5E] text-white font-black py-4 rounded-xl border-[4px] border-[#0B3E3A] dark:border-white shadow-[4px_4px_0_0_#0B3E3A] dark:shadow-[4px_4px_0_0_#FFFFFF] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0B3E3A] active:shadow-none transition-all uppercase flex justify-center items-center gap-2 text-lg">
+                <LogOut size={24} strokeWidth={3} /> KELUAR AKUN
               </button>
             </div>
           </div>
@@ -1573,6 +1597,17 @@ export default function DashboardPage() {
                   <span className={`text-sm font-black text-right max-w-[60%] text-[#0B3E3A] dark:text-white uppercase`}>{row.val}</span>
                 </div>
               ))}
+
+              {/* ── INFO LOKASI GPS ── */}
+              {selectedReceipt.latitude && selectedReceipt.longitude && (
+                <div className="flex justify-between items-center border-b-[3px] border-dashed border-[#0B3E3A]/20 dark:border-white/20 pb-2">
+                  <span className="text-[#0B3E3A] dark:text-white opacity-70 text-xs font-black uppercase">Lokasi</span>
+                  <a href={`https://maps.google.com/?q=${selectedReceipt.latitude},${selectedReceipt.longitude}`} target="_blank" rel="noreferrer" className="text-xs font-black bg-[#BAE6FD] text-[#0B3E3A] border-[2px] border-[#0B3E3A] px-2 py-1 rounded-md shadow-[2px_2px_0_0_#0B3E3A] flex items-center gap-1 hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all uppercase">
+                    <MapPin size={12} strokeWidth={3} /> BUKA PETA
+                  </a>
+                </div>
+              )}
+
               <div className="flex justify-between items-center border-b-[3px] border-dashed border-[#0B3E3A]/20 dark:border-white/20 pb-2">
                 <span className="text-[#0B3E3A] dark:text-white opacity-70 text-xs font-black uppercase">Ref ID</span>
                 <div className="flex items-center gap-2">
